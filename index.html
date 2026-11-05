@@ -10,6 +10,8 @@
 <meta name="theme-color" content="#0b0d10">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <title>DriveDeck</title>
 <style>
 :root{
@@ -56,15 +58,61 @@ svg{display:block}
 /* ---------- cards ---------- */
 .card{background:var(--card);border-radius:var(--r);padding:18px;min-width:0}
 .ttl{font-size:13px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px}
-.home{display:grid;gap:10px;min-height:100%;
-  grid-template-columns:1.25fr 1fr;grid-template-rows:auto 1fr;
-  grid-template-areas:"nav info" "nav music"}
-.home .c-nav{grid-area:nav;display:flex;flex-direction:column}
-.home .c-info{grid-area:info}
-.home .c-music{grid-area:music;display:flex;flex-direction:column}
+.home{display:grid;gap:10px;height:100%;
+  grid-template-columns:1.4fr 1fr;grid-template-rows:auto 1fr;
+  grid-template-areas:"map apps" "map music"}
+.home .c-info{grid-area:info;display:none}
+.home .c-map{grid-area:map}
+.home .c-apps{grid-area:apps;padding:12px 14px}
+.home .c-apps .apps{margin:0}
+.home .c-music{grid-area:music;display:flex;flex-direction:column;min-height:0;overflow:auto}
 @media (orientation:portrait){
-  .home{grid-template-columns:1fr;grid-template-rows:auto auto auto;
-    grid-template-areas:"info" "nav" "music";height:auto}
+  .home{grid-template-columns:1fr;grid-template-rows:auto 48vh auto auto;height:auto;
+    grid-template-areas:"info" "map" "apps" "music"}
+  .home .c-info{display:block}
+}
+
+/* mapa */
+.c-map{position:relative;padding:0;overflow:hidden;min-height:0}
+#mapWrap{position:absolute;inset:0}
+#map{position:absolute;inset:0;background:#1b1f25}
+.leaflet-container{background:#1b1f25;font:inherit}
+.leaflet-control-attribution{background:rgba(0,0,0,.45)!important;color:#9aa!important;font-size:9px!important}
+.leaflet-control-attribution a{color:#bcc!important}
+.nomap{position:absolute;inset:0;display:grid;place-items:center;color:var(--mu);font-size:14px;text-align:center;padding:20px}
+.mtop{position:absolute;top:10px;left:10px;right:10px;z-index:500;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.mtop>*{pointer-events:auto}
+.msearch{margin:0}
+.mtop.routing .msearch{display:none}
+.row .fi{width:32px;height:32px;display:grid;place-items:center;flex:none}.row .fi svg{width:20px;height:20px}
+.msearch input{background:rgba(21,24,29,.94);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.route{display:none;background:rgba(21,24,29,.96);border-radius:16px;padding:12px}
+.route.on{display:block}
+.route .rt{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.route .t{min-width:0}
+.route b{font-size:16px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.route small{color:var(--mu);font-size:13px;display:block;margin-top:2px}
+.route .rgo{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.route .rgo button{border-radius:12px;padding:11px 4px;font-weight:700;color:#000;font-size:14px}
+.route .rx{width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;flex:none}
+.mbottom{position:absolute;left:10px;right:10px;bottom:10px;z-index:500;display:flex;gap:8px;align-items:flex-end;pointer-events:none}
+.mbottom>*{pointer-events:auto}
+.speedo{flex:none}
+.speedo .sp{width:64px;height:64px;border-radius:50%;background:rgba(21,24,29,.96);border:3px solid #3a414c;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.speedo .sp b{font-size:23px;line-height:1;font-variant-numeric:tabular-nums}
+.speedo .sp small{font-size:10px;color:var(--mu)}
+.speedo .gpsbtn{background:rgba(21,24,29,.96)}
+.chips{display:flex;gap:6px;overflow-x:auto;flex:1;min-width:0;justify-content:flex-start}
+.chip{flex:none;background:rgba(21,24,29,.96);border-radius:14px;padding:11px 14px;font-weight:600;font-size:14px;display:flex;gap:6px;align-items:center}
+.chip svg{width:16px;height:16px;color:#9cc2ff}
+.recenter{position:absolute;right:10px;bottom:84px;z-index:500;width:48px;height:48px;border-radius:50%;background:rgba(21,24,29,.96);display:grid;place-items:center;color:#9cc2ff}
+.recenter.on{background:var(--ac);color:#fff}
+.recenter svg{width:24px;height:24px}
+.me svg{width:30px;height:30px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
+.navpage{display:grid;grid-template-columns:1.6fr 1fr;gap:10px;height:100%}
+.navside{display:flex;flex-direction:column;gap:10px;overflow:auto;min-height:0}
+@media (orientation:portrait){
+  .navpage{grid-template-columns:1fr;grid-template-rows:58vh auto;height:auto}
 }
 
 /* info (relógio + velocidade) */
@@ -198,27 +246,35 @@ svg{display:block}
     <section class="view on" id="v-home">
       <div class="home">
         <div class="card c-info">
-          <div class="info">
-            <div>
-              <div class="bigclock" id="bigClock">--:--</div>
-              <div class="date" id="bigDate"></div>
+          <div class="bigclock" id="bigClock">--:--</div>
+          <div class="date" id="bigDate"></div>
+        </div>
+
+        <div class="card c-map" id="homeMapSlot">
+          <div id="mapWrap">
+            <div id="map"></div>
+            <div class="mtop">
+              <form class="search msearch" id="homeSearch">
+                <input id="homeQ" placeholder="Para onde?" autocomplete="off" enterkeyhint="go">
+                <button class="gobtn" type="submit">Ir</button>
+              </form>
+              <div class="route" id="routeBox"></div>
             </div>
-            <div class="speed" id="speedBox"></div>
+            <button class="recenter" id="recenter" aria-label="Centralizar no carro"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4.5 20.3l.7.7L12 18l6.8 3 .7-.7z"/></svg></button>
+            <div class="mbottom">
+              <div class="speedo" id="speedBox"></div>
+              <div class="chips" id="homeFavs"></div>
+            </div>
           </div>
         </div>
 
-        <div class="card c-nav">
+        <div class="card c-apps">
           <div class="apps">
             <button class="appbtn" data-open="waze"><span class="ic" style="background:var(--waze)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a8 8 0 0 0-8 8c0 1.6.5 2.6 1.2 3.4-.5 1-1.3 1.6-2.2 1.9.9 1 2.4 1.6 4 1.6a2 2 0 0 0 3.9.6h3.2a2 2 0 0 0 3.9-.5A8 8 0 0 0 12 3zm-2.5 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm5 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM12 15c-1.7 0-3-1-3.4-2.2h1.4c.4.6 1.1 1 2 1s1.6-.4 2-1h1.4C15 14 13.7 15 12 15z"/></svg></span>Waze</button>
-            <button class="appbtn" data-open="gmaps"><span class="ic" style="background:var(--gmaps)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>Google Maps</button>
+            <button class="appbtn" data-open="gmaps"><span class="ic" style="background:var(--gmaps)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>Maps</button>
             <button class="appbtn" data-open="spotify"><span class="ic" style="background:var(--spot)"><svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"><path d="M5 9c4.5-1.5 9.5-1 14 1.2M6 12.6c3.8-1.1 7.8-.7 11.2 1.1M7 16c3-.8 6-.5 8.6.9"/></svg></span>Spotify</button>
             <button class="appbtn" data-open="whatsapp"><span class="ic" style="background:var(--wa)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.2 21.8l4.9-1.3A9.8 9.8 0 1 0 12 2.2zm5.4 13.8c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.7-.1l1-1.2c.2-.3.4-.2.7-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.3z"/></svg></span>WhatsApp</button>
           </div>
-          <form class="search" id="homeSearch">
-            <input id="homeQ" placeholder="Para onde?" autocomplete="off" enterkeyhint="go">
-            <button class="gobtn" type="submit">Ir</button>
-          </form>
-          <div class="favs" id="homeFavs"></div>
         </div>
 
         <div class="card c-music" id="homeMusic"></div>
@@ -227,16 +283,12 @@ svg{display:block}
 
     <!-- NAVEGAÇÃO -->
     <section class="view" id="v-nav">
-      <div class="page">
-        <h2>Navegação</h2>
-        <div class="card">
-          <form class="search" id="navSearch" style="margin:0">
-            <input id="navQ" placeholder="Endereço, lugar ou CEP" autocomplete="off" enterkeyhint="go">
-            <button class="gobtn" type="submit">Ir</button>
-          </form>
+      <div class="navpage">
+        <div class="card c-map" id="navMapSlot"></div>
+        <div class="navside">
+          <div class="card"><p class="ttl">Favoritos</p><div class="favs" id="navFavs"></div></div>
+          <div class="card"><p class="ttl">Recentes</p><div class="list" id="navRecent"></div></div>
         </div>
-        <div class="card"><p class="ttl">Favoritos</p><div class="favs" id="navFavs"></div></div>
-        <div class="card"><p class="ttl">Recentes</p><div class="list" id="navRecent"></div></div>
       </div>
     </section>
 
@@ -299,7 +351,9 @@ const S = {
   navPadrao: store.get('navPadrao', 'ask'),
   telaAcesa: store.get('telaAcesa', true),
   gps: store.get('gps', false),
-  spClient: store.get('spClient', '')
+  spClient: store.get('spClient', ''),
+  mapaPrimeiro: store.get('mapaPrimeiro', true),
+  lastLL: store.get('lastLL', null)
 };
 const save = k => store.set(k, S[k]);
 
@@ -338,31 +392,154 @@ function tick(){
 }
 setInterval(tick, 5000); tick();
 
-/* ================== velocímetro (GPS) ================== */
+/* ================== GPS + velocímetro ================== */
 let watchId = null, lastPos = null;
-const DIRS = ['N','NE','L','SE','S','SO','O','NO'];
 function renderSpeed(){
   const box = $('#speedBox');
-  if(!S.gps){ box.innerHTML = '<button class="gpsbtn" id="gpsOn">Ativar velocímetro</button>'; $('#gpsOn').onclick = startGps; return; }
-  let kmh = '--', dir = '';
-  if(lastPos){
-    const sp = lastPos.coords.speed;
-    kmh = (sp==null || sp<0) ? '0' : Math.round(sp*3.6);
-    const h = lastPos.coords.heading;
-    if(h!=null && !isNaN(h) && sp>1) dir = ' · ' + DIRS[Math.round(h/45)%8];
-  }
-  box.innerHTML = `<div class="v">${kmh}</div><div class="u">km/h${dir}</div>`;
+  if(!S.gps){ box.innerHTML = '<button class="gpsbtn" id="gpsOn">Ativar GPS</button>'; $('#gpsOn').onclick = startGps; return; }
+  let kmh = '--';
+  if(lastPos){ const sp = lastPos.coords.speed; kmh = (sp==null || sp<0) ? '0' : Math.round(sp*3.6); }
+  box.innerHTML = `<div class="sp"><b>${kmh}</b><small>km/h</small></div>`;
 }
 function startGps(){
   if(!('geolocation' in navigator)){ toast('GPS indisponível neste navegador'); return; }
   S.gps = true; save('gps'); renderSpeed();
   if(watchId!==null) return;
   watchId = navigator.geolocation.watchPosition(
-    p => { lastPos = p; renderSpeed(); },
+    p => { lastPos = p; renderSpeed(); onPos(p); },
     e => { if(e.code===1){ S.gps=false; save('gps'); watchId=null; toast('Permita a localização nos Ajustes do iPhone'); } renderSpeed(); },
     {enableHighAccuracy:true, maximumAge:1000, timeout:15000}
   );
 }
+
+/* ================== mapa (OpenStreetMap + CARTO, grátis) ================== */
+let map = null, meMarker = null, follow = true, routeLine = null, destMarker = null, route = null, target = null, routeSeq = 0;
+function initMap(){
+  if(typeof L === 'undefined'){ $('#map').innerHTML = '<div class="nomap">Mapa indisponível sem internet.<br>Os atalhos continuam funcionando.</div>'; return; }
+  map = L.map('map', {zoomControl:false, attributionControl:true}).setView(S.lastLL || [-23.5015,-47.4526], S.lastLL ? 15 : 12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    {subdomains:'abcd', maxZoom:20, attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+  map.attributionControl.setPrefix(false);
+  map.on('dragstart', () => { follow = false; updRecenter(); });
+}
+function meIcon(h){
+  const arrow = h!=null && !isNaN(h);
+  const svg = arrow
+    ? '<svg viewBox="0 0 30 30"><circle cx="15" cy="15" r="13.5" fill="#2f7cf6" stroke="#fff" stroke-width="2"/><path d="M15 6.5l6 14.5-6-3.4-6 3.4z" fill="#fff"/></svg>'
+    : '<svg viewBox="0 0 30 30"><circle cx="15" cy="15" r="13" fill="rgba(47,124,246,.25)"/><circle cx="15" cy="15" r="8" fill="#2f7cf6" stroke="#fff" stroke-width="3"/></svg>';
+  return L.divIcon({className:'', iconSize:[30,30], iconAnchor:[15,15],
+    html:`<div class="me" style="transform:rotate(${arrow?h:0}deg)">${svg}</div>`});
+}
+const destIcon = () => L.divIcon({className:'', iconSize:[34,44], iconAnchor:[17,42],
+  html:'<svg viewBox="0 0 24 32" width="34" height="44"><path d="M12 0C5.4 0 0 5.2 0 11.7 0 20.5 12 32 12 32s12-11.5 12-20.3C24 5.2 18.6 0 12 0z" fill="#ff4d5a"/><circle cx="12" cy="11.5" r="4.5" fill="#fff"/></svg>'});
+function onPos(p){
+  const ll = [p.coords.latitude, p.coords.longitude];
+  S.lastLL = ll; save('lastLL');
+  if(!map) return;
+  const h = (p.coords.speed > 1) ? p.coords.heading : null;
+  if(!meMarker) meMarker = L.marker(ll, {icon:meIcon(h), interactive:false, zIndexOffset:1000}).addTo(map);
+  else { meMarker.setLatLng(ll); meMarker.setIcon(meIcon(h)); }
+  if(follow) map.setView(ll, Math.max(map.getZoom(), 15), {animate:true});
+  if(route) routeProgress(ll);
+}
+function updRecenter(){ $('#recenter').classList.toggle('on', !follow); }
+$('#recenter').onclick = () => {
+  follow = true; updRecenter();
+  if(!S.gps){ startGps(); return; }
+  if(map && lastPos) map.setView([lastPos.coords.latitude, lastPos.coords.longitude], 16);
+};
+
+async function geocode(q){
+  const key = q.toLowerCase().trim(), cache = store.get('geo', {});
+  if(cache[key]) return cache[key];
+  const p = new URLSearchParams({format:'jsonv2', q, limit:'1', countrycodes:'br', 'accept-language':'pt-BR'});
+  const ref = lastPos ? [lastPos.coords.latitude, lastPos.coords.longitude] : S.lastLL;
+  if(ref){ const d = 0.7; p.set('viewbox', [ref[1]-d, ref[0]+d, ref[1]+d, ref[0]-d].join(',')); }
+  const r = await fetch('https://nominatim.openstreetmap.org/search?' + p);
+  if(!r.ok) throw new Error('geo');
+  const j = await r.json();
+  if(!j.length) return null;
+  const res = {lat:+j[0].lat, lon:+j[0].lon};
+  cache[key] = res; const ks = Object.keys(cache); if(ks.length > 80) delete cache[ks[0]];
+  store.set('geo', cache);
+  return res;
+}
+async function getRoute(from, to){
+  const u = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to.lon},${to.lat}?overview=full&geometries=geojson`;
+  const r = await fetch(u); if(!r.ok) throw new Error('rota');
+  const j = await r.json();
+  if(j.code !== 'Ok' || !j.routes || !j.routes.length) return null;
+  const rt = j.routes[0], c = rt.geometry.coordinates.map(x => [x[1], x[0]]);
+  const rem = new Array(c.length).fill(0);   // distância restante a partir de cada ponto
+  for(let i = c.length-2; i >= 0; i--) rem[i] = rem[i+1] + L.latLng(c[i]).distanceTo(c[i+1]);
+  return {coords:c, rem, dist:rt.distance, dur:rt.duration, distLeft:rt.distance, durLeft:rt.duration};
+}
+const fmtDist = m => m >= 1000 ? (m/1000).toFixed(m >= 10000 ? 0 : 1).replace('.', ',') + ' km' : Math.max(10, Math.round(m/10)*10) + ' m';
+const fmtDur = s => { const m = Math.max(1, Math.round(s/60)); return m < 60 ? m + ' min' : Math.floor(m/60) + ' h ' + String(m%60).padStart(2,'0') + ' min'; };
+function routeSub(){
+  if(!target) return '';
+  if(target.loading) return 'Procurando no mapa…';
+  if(target.lat == null) return 'Não encontrei no mapa — abra mesmo assim:';
+  if(route){
+    if(route.distLeft < 40) return 'Você chegou ao destino';
+    const eta = new Date(Date.now() + route.durLeft*1000).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+    return `${fmtDist(route.distLeft)} · ${fmtDur(route.durLeft)} · chegada ${eta} (sem trânsito)`;
+  }
+  return S.gps ? 'Rota indisponível agora — abra no app de navegação' : 'Ative o GPS para ver a rota e o tempo';
+}
+function renderRouteBox(){
+  const box = $('#routeBox');
+  $('.mtop').classList.toggle('routing', !!target);
+  if(!target){ box.classList.remove('on'); box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="rt"><div class="t"><b>${esc(target.label)}</b><small id="rSub">${esc(routeSub())}</small></div>
+      <button class="rx" id="rClear" aria-label="Fechar rota">${ICON_X}</button></div>
+    <div class="rgo"><button data-app="waze" style="background:var(--waze)">Waze</button><button data-app="gmaps" style="background:var(--gmaps)">Google Maps</button><button data-app="apple" style="background:#e9e9ee">Apple</button></div>`;
+  box.classList.add('on');
+}
+function fitRoute(){
+  if(!map || !routeLine) return;
+  const top = $('.mtop').offsetHeight + 24;
+  map.fitBounds(routeLine.getBounds(), {paddingTopLeft:[30, top], paddingBottomRight:[70, 90]});
+}
+function routeProgress(ll){
+  const c = route.coords, k = Math.cos(ll[0]*Math.PI/180), step = c.length > 4000 ? 3 : 1;
+  let bi = 0, bd = Infinity;
+  for(let i = 0; i < c.length; i += step){ const d = (c[i][0]-ll[0])**2 + ((c[i][1]-ll[1])*k)**2; if(d < bd){ bd = d; bi = i; } }
+  route.distLeft = route.rem[bi]; route.durLeft = route.dur * (route.distLeft / Math.max(route.dist, 1));
+  const el = $('#rSub'); if(el) el.textContent = routeSub();
+}
+function clearRoute(){
+  if(map){ if(routeLine) map.removeLayer(routeLine); if(destMarker) map.removeLayer(destMarker); }
+  routeLine = destMarker = route = target = null; renderRouteBox();
+}
+async function previewRoute(query, label){
+  const seq = ++routeSeq;
+  clearRoute();
+  target = {query, label:label || query, loading:true}; renderRouteBox();
+  let g = null; try{ g = await geocode(query); }catch(e){}
+  if(seq !== routeSeq) return;
+  target.loading = false;
+  if(!g){ renderRouteBox(); return; }
+  target.lat = g.lat; target.lon = g.lon;
+  destMarker = L.marker([g.lat, g.lon], {icon:destIcon(), interactive:false}).addTo(map);
+  follow = false; updRecenter();
+  const from = lastPos ? [lastPos.coords.latitude, lastPos.coords.longitude] : null;
+  let rt = null; if(from){ try{ rt = await getRoute(from, g); }catch(e){} }
+  if(seq !== routeSeq) return;
+  if(rt){
+    route = rt;
+    routeLine = L.polyline(rt.coords, {color:'#3d8bff', weight:7, opacity:.95, lineJoin:'round'}).addTo(map);
+  }
+  renderRouteBox();
+  if(rt) fitRoute(); else map.setView([g.lat, g.lon], 15);
+}
+$('#routeBox').addEventListener('click', e => {
+  if(e.target.closest('#rClear')){ routeSeq++; clearRoute(); follow = true; updRecenter();
+    if(map && lastPos) map.setView([lastPos.coords.latitude, lastPos.coords.longitude], 16); return; }
+  const b = e.target.closest('[data-app]'); if(!b || !target) return;
+  const u = (target.lat != null ? routeUrlsLL(target.lat, target.lon) : routeUrls(target.query))[b.dataset.app];
+  launch(u[0], u[1]);
+});
 
 /* ================== tela sempre acesa ================== */
 let wakeLock = null;
@@ -381,12 +558,21 @@ function routeUrls(dest){
     apple: [`maps://?daddr=${q}&dirflg=d`, `https://maps.apple.com/?daddr=${q}&dirflg=d`]
   };
 }
+function routeUrlsLL(la, lo){
+  const c = `${la},${lo}`;
+  return {
+    waze:  [`waze://?ll=${c}&navigate=yes`, `https://waze.com/ul?ll=${c}&navigate=yes`],
+    gmaps: [`comgooglemaps://?daddr=${c}&directionsmode=driving`, `https://www.google.com/maps/dir/?api=1&destination=${c}&travelmode=driving`],
+    apple: [`maps://?daddr=${c}&dirflg=d`, `https://maps.apple.com/?daddr=${c}&dirflg=d`]
+  };
+}
 let pendingDest = '';
-function go(dest){
+function go(dest, label){
   dest = (dest||'').trim();
   if(!dest){ toast('Digite um destino'); return; }
   S.recentes = [dest, ...S.recentes.filter(r => r.toLowerCase()!==dest.toLowerCase())].slice(0,8); save('recentes'); renderNav();
-  if(S.navPadrao==='ask'){ pendingDest = dest; $('#sheetDest').textContent = dest; $('#sheet').classList.add('on'); return; }
+  if(S.mapaPrimeiro && map){ previewRoute(dest, label); return; }
+  if(S.navPadrao==='ask'){ pendingDest = dest; $('#sheetDest').textContent = label || dest; $('#sheet').classList.add('on'); return; }
   const u = routeUrls(dest)[S.navPadrao]; launch(u[0], u[1]);
 }
 $('#sheet').addEventListener('click', e => {
@@ -394,27 +580,26 @@ $('#sheet').addEventListener('click', e => {
   if(b){ const u = routeUrls(pendingDest)[b.dataset.app]; launch(u[0], u[1]); }
   $('#sheet').classList.remove('on');
 });
+const favIcon = f => /casa/i.test(f.nome) ? ICON_HOME : /trab/i.test(f.nome) ? ICON_WORK : ICON_PIN;
 function favHtml(f, i){
-  const ic = /casa/i.test(f.nome) ? ICON_HOME : /trab/i.test(f.nome) ? ICON_WORK : ICON_PIN;
-  return `<button class="fav" data-fav="${i}"><span class="fi">${ic}</span><span class="ft"><b>${esc(f.nome)}</b><small>${f.end ? esc(f.end) : 'Toque para configurar'}</small></span></button>`;
+  return `<button class="fav" data-fav="${i}"><span class="fi">${favIcon(f)}</span><span class="ft"><b>${esc(f.nome)}</b><small>${f.end ? esc(f.end) : 'Toque para configurar'}</small></span></button>`;
 }
 function renderNav(){
-  const favs = S.favs.map(favHtml).join('') || '<p class="hint">Adicione favoritos em Ajustes.</p>';
-  $('#homeFavs').innerHTML = favs; $('#navFavs').innerHTML = favs;
+  $('#homeFavs').innerHTML = S.favs.map((f,i) => f.nome ? `<button class="chip" data-fav="${i}">${favIcon(f)}${esc(f.nome)}</button>` : '').join('');
+  $('#navFavs').innerHTML = S.favs.map(favHtml).join('') || '<p class="hint">Adicione favoritos em Ajustes.</p>';
   $('#navRecent').innerHTML = S.recentes.length
     ? S.recentes.map((r,i)=>`<button class="row" data-rec="${i}"><span class="fi" style="color:var(--mu)">${ICON_PIN}</span><span class="grow"><b>${esc(r)}</b></span></button>`).join('')
     : '<p class="hint">Os destinos que você buscar aparecem aqui.</p>';
 }
 document.addEventListener('click', e => {
   const f = e.target.closest('[data-fav]');
-  if(f){ const fav = S.favs[+f.dataset.fav]; if(!fav.end){ show('settings'); toast('Preencha o endereço de "'+fav.nome+'"'); return; } go(fav.end); return; }
+  if(f){ const fav = S.favs[+f.dataset.fav]; if(!fav.end){ show('settings'); toast('Preencha o endereço de "'+fav.nome+'"'); return; } go(fav.end, fav.nome); return; }
   const r = e.target.closest('[data-rec]'); if(r){ go(S.recentes[+r.dataset.rec]); return; }
   const o = e.target.closest('[data-open]'); if(o){ openApp(o.dataset.open); return; }
   const p = e.target.closest('[data-pl]'); if(p){ openPlaylist(S.pls[+p.dataset.pl]); return; }
   const c = e.target.closest('[data-call]'); if(c){ window.location.href = 'tel:' + c.dataset.call; return; }
 });
-$('#homeSearch').onsubmit = e => { e.preventDefault(); go($('#homeQ').value); $('#homeQ').blur(); };
-$('#navSearch').onsubmit = e => { e.preventDefault(); go($('#navQ').value); $('#navQ').blur(); };
+$('#homeSearch').onsubmit = e => { e.preventDefault(); go($('#homeQ').value); $('#homeQ').value=''; $('#homeQ').blur(); };
 
 function openApp(a){
   const m = {
@@ -572,6 +757,7 @@ function renderSettings(){
       <div class="seg" id="navSeg">
         ${[['ask','Perguntar'],['waze','Waze'],['gmaps','Google Maps'],['apple','Apple Mapas']].map(([v,l])=>`<button data-nv="${v}" class="${S.navPadrao===v?'on':''}">${l}</button>`).join('')}
       </div></div>
+    <div class="card"><div class="tog"><div><b>Ver a rota no mapa antes</b><div class="hint">Desligado: abre direto no app de navegação padrão</div></div><button class="sw ${S.mapaPrimeiro?'on':''}" id="swMap" aria-label="Ver a rota no mapa antes"></button></div></div>
     <div class="card"><p class="ttl">Destinos favoritos</p>${editList('favs',[{k:'nome',ph:'Nome (ex.: Casa)'},{k:'end',ph:'Endereço completo'}],'Adicionar destino')}</div>
     <div class="card"><p class="ttl">Playlists do Spotify</p>${editList('pls',[{k:'nome',ph:'Nome'},{k:'link',ph:'Link (Compartilhar → Copiar link)'}],'Adicionar playlist')}</div>
     <div class="card"><p class="ttl">Contatos rápidos</p>${editList('contatos',[{k:'nome',ph:'Nome'},{k:'tel',ph:'Telefone',type:'tel'}],'Adicionar contato')}</div>
@@ -582,8 +768,9 @@ function renderSettings(){
     <div class="card"><p class="ttl">Backup das configurações</p>
       <textarea id="bk" rows="3" placeholder="Cole aqui um backup para restaurar"></textarea>
       <div style="display:flex;gap:8px;margin-top:10px"><button class="btn g" id="bkCopy">Copiar backup</button><button class="btn g" id="bkLoad">Restaurar</button></div></div>
-    <p class="hint" style="text-align:center;margin:6px 0 14px">DriveDeck · uso pessoal · configure antes de sair com o carro</p>`;
+    <p class="hint" style="text-align:center;margin:6px 0 14px">DriveDeck <b>versão 3</b> · uso pessoal · configure antes de sair com o carro</p>`;
   $('#navSeg').onclick = e => { const b=e.target.closest('[data-nv]'); if(!b) return; S.navPadrao=b.dataset.nv; save('navPadrao'); renderSettings(); };
+  $('#swMap').onclick = () => { S.mapaPrimeiro=!S.mapaPrimeiro; save('mapaPrimeiro'); renderSettings(); };
   $('#swWake').onclick = () => { S.telaAcesa=!S.telaAcesa; save('telaAcesa'); if(S.telaAcesa) keepAwake(); else if(wakeLock){ wakeLock.release(); wakeLock=null; } renderSettings(); };
   if(SP.tok) $('#spOut').onclick = spLogout;
   else{ $('#spClient').oninput = e => { S.spClient = e.target.value.trim(); save('spClient'); }; $('#spIn').onclick = spLogin; }
@@ -614,13 +801,20 @@ function show(v){
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on', x.id==='v-'+v));
   document.querySelectorAll('.dbtn').forEach(x=>x.classList.toggle('on', x.dataset.v===v));
   $('#v-'+v).scrollTop = 0;
+  if(v==='home' || v==='nav'){
+    const slot = $(v==='home' ? '#homeMapSlot' : '#navMapSlot');
+    if($('#mapWrap').parentNode !== slot) slot.appendChild($('#mapWrap'));
+    if(map) setTimeout(() => { map.invalidateSize(); if(routeLine && !follow) fitRoute(); }, 60);
+  }
 }
+window.addEventListener('resize', () => { if(map) setTimeout(() => map.invalidateSize(), 150); });
 $('#dock').onclick = e => { const b=e.target.closest('[data-v]'); if(b) show(b.dataset.v); };
 
 function renderAll(){ renderNav(); renderMusic(); renderPhone(); renderSettings(); renderSpeed(); }
 
 /* ================== início ================== */
 (async function init(){
+  initMap();
   renderAll();
   await spCallback();
   renderMusic(); renderSettings(); spPoll();
@@ -628,7 +822,14 @@ function renderAll(){ renderNav(); renderMusic(); renderPhone(); renderSettings(
   document.addEventListener('click', keepAwake, {once:true});
   keepAwake();
   if('serviceWorker' in navigator && location.protocol==='https:'){
-    try{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }catch(e){}
+    try{
+      navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(reg => {
+        document.addEventListener('visibilitychange', () => { if(!document.hidden) reg.update().catch(()=>{}); });
+      }).catch(()=>{});
+      // quando chegar versão nova, recarrega uma vez sozinho
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if(!reloaded){ reloaded = true; location.reload(); } });
+    }catch(e){}
   }
 })();
 </script>
