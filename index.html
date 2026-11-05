@@ -77,6 +77,7 @@ svg{display:block}
 #mapWrap{position:absolute;inset:0}
 #map{position:absolute;inset:0;background:#1b1f25}
 .leaflet-container{background:#1b1f25;font:inherit}
+.darktiles{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.55)}
 .leaflet-control-attribution{background:rgba(0,0,0,.45)!important;color:#9aa!important;font-size:9px!important}
 .leaflet-control-attribution a{color:#bcc!important}
 .nomap{position:absolute;inset:0;display:grid;place-items:center;color:var(--mu);font-size:14px;text-align:center;padding:20px}
@@ -125,8 +126,8 @@ svg{display:block}
 .gpsbtn{background:var(--card2);border-radius:14px;padding:12px 14px;font-size:14px;font-weight:600}
 
 /* atalhos de apps */
-.apps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
-.appbtn{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:13px;color:var(--mu)}
+.apps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.appbtn{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:13px;color:var(--mu);min-width:0;white-space:nowrap}
 .appbtn .ic{width:100%;max-width:76px;aspect-ratio:1;border-radius:20px;display:grid;place-items:center;color:#fff}
 .appbtn .ic svg{width:44%;height:44%}
 
@@ -417,8 +418,9 @@ let map = null, meMarker = null, follow = true, routeLine = null, destMarker = n
 function initMap(){
   if(typeof L === 'undefined'){ $('#map').innerHTML = '<div class="nomap">Mapa indisponível sem internet.<br>Os atalhos continuam funcionando.</div>'; return; }
   map = L.map('map', {zoomControl:false, attributionControl:true}).setView(S.lastLL || [-23.5015,-47.4526], S.lastLL ? 15 : 12);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    {subdomains:'abcd', maxZoom:20, attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+  // OpenStreetMap: grátis e sem chave. O filtro CSS deixa o mapa escuro.
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {maxZoom:19, className:'darktiles', attribution:'© OpenStreetMap'}).addTo(map);
   map.attributionControl.setPrefix(false);
   map.on('dragstart', () => { follow = false; updRecenter(); });
 }
@@ -710,13 +712,13 @@ function npHtml(big){
     </div>`;
 }
 function renderMusic(){
-  const pls = S.pls.map((p,i)=>`<button class="pl" data-pl="${i}">${ICON_NOTE}${esc(p.nome)}</button>`).join('');
+  const pls = S.pls.map((p,i)=>`<button class="pl" data-pl="${i}">${ICON_NOTE}${esc(p.nome || 'Playlist')}</button>`).join('');
   $('#homeMusic').innerHTML = `<p class="ttl">Tocando agora</p>${npHtml(false)}
     ${pls ? `<div class="pls">${pls}</div>` : ''}`;
   $('#musicMain').innerHTML = npHtml(true) + (SP.tok ? '' :
     `<p class="hint" style="margin-top:14px">Os botões abrem o Spotify. Para ver a música e controlar daqui, conecte sua conta em <b>Ajustes</b> (exige Spotify Premium).</p>`);
   $('#musicPls').innerHTML = S.pls.length
-    ? S.pls.map((p,i)=>`<button class="row" data-pl="${i}"><span style="color:var(--spot)">${ICON_NOTE}</span><span class="grow"><b>${esc(p.nome)}</b><small>${esc(p.link)}</small></span></button>`).join('')
+    ? S.pls.map((p,i)=>`<button class="row" data-pl="${i}"><span style="color:var(--spot)">${ICON_NOTE}</span><span class="grow"><b>${esc(p.nome || 'Playlist')}</b><small>${esc(p.link)}</small></span></button>`).join('')
     : '<p class="hint">Adicione playlists em Ajustes colando o link de compartilhamento do Spotify.</p>';
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-sp]'); if(b) spCmd(b.dataset.sp); });
@@ -768,7 +770,7 @@ function renderSettings(){
     <div class="card"><p class="ttl">Backup das configurações</p>
       <textarea id="bk" rows="3" placeholder="Cole aqui um backup para restaurar"></textarea>
       <div style="display:flex;gap:8px;margin-top:10px"><button class="btn g" id="bkCopy">Copiar backup</button><button class="btn g" id="bkLoad">Restaurar</button></div></div>
-    <p class="hint" style="text-align:center;margin:6px 0 14px">DriveDeck <b>versão 3</b> · uso pessoal · configure antes de sair com o carro</p>`;
+    <p class="hint" style="text-align:center;margin:6px 0 14px">DriveDeck <b>versão 4</b> · uso pessoal · configure antes de sair com o carro</p>`;
   $('#navSeg').onclick = e => { const b=e.target.closest('[data-nv]'); if(!b) return; S.navPadrao=b.dataset.nv; save('navPadrao'); renderSettings(); };
   $('#swMap').onclick = () => { S.mapaPrimeiro=!S.mapaPrimeiro; save('mapaPrimeiro'); renderSettings(); };
   $('#swWake').onclick = () => { S.telaAcesa=!S.telaAcesa; save('telaAcesa'); if(S.telaAcesa) keepAwake(); else if(wakeLock){ wakeLock.release(); wakeLock=null; } renderSettings(); };
