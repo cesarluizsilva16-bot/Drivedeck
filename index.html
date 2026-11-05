@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DriveDeck">
+<meta name="theme-color" content="#0b0d10">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>DriveDeck</title>
+<style>
+:root{
+  --bg:#0b0d10; --card:#15181d; --card2:#1c2026; --line:#262b33;
+  --tx:#f2f4f7; --mu:#8a929e; --ac:#2f7cf6;
+  --waze:#33ccff; --gmaps:#34a853; --spot:#1db954; --wa:#25d366; --amaps:#ff5a5f;
+  --r:22px;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;
+  -webkit-user-select:none;user-select:none;overflow:hidden;overscroll-behavior:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+input,textarea,select{font:inherit;color:var(--tx);background:var(--card2);border:1px solid var(--line);
+  border-radius:12px;padding:12px 14px;width:100%;-webkit-user-select:text;user-select:text;outline:none}
+input:focus,textarea:focus{border-color:var(--ac)}
+svg{display:block}
+
+/* ---------- layout ---------- */
+.app{display:grid;height:100%;
+  padding:calc(var(--sat) + 8px) calc(var(--sar) + 8px) calc(var(--sab) + 8px) calc(var(--sal) + 8px);
+  grid-template-columns:84px 1fr;gap:10px}
+.dock{background:var(--card);border-radius:var(--r);display:flex;flex-direction:column;
+  align-items:center;justify-content:space-between;padding:12px 0}
+.dock .clk{font-size:15px;font-weight:600;letter-spacing:.3px}
+.dock nav{display:flex;flex-direction:column;gap:8px}
+.dbtn{width:58px;height:58px;border-radius:16px;display:grid;place-items:center;color:var(--mu);transition:.15s}
+.dbtn.on{background:var(--card2);color:var(--tx)}
+.dbtn svg{width:28px;height:28px}
+.main{min-height:0;min-width:0;position:relative}
+.view{position:absolute;inset:0;display:none;overflow:auto;-webkit-overflow-scrolling:touch}
+.view.on{display:block}
+
+@media (orientation:portrait){
+  .app{grid-template-columns:1fr;grid-template-rows:1fr 76px}
+  .dock{flex-direction:row;padding:0 14px;order:2;justify-content:center}
+  .dock nav{flex-direction:row;gap:4px}
+  .dock .clk{display:none}
+  .dock .dspacer{display:none}
+}
+
+/* ---------- cards ---------- */
+.card{background:var(--card);border-radius:var(--r);padding:18px;min-width:0}
+.ttl{font-size:13px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px}
+.home{display:grid;gap:10px;min-height:100%;
+  grid-template-columns:1.25fr 1fr;grid-template-rows:auto 1fr;
+  grid-template-areas:"nav info" "nav music"}
+.home .c-nav{grid-area:nav;display:flex;flex-direction:column}
+.home .c-info{grid-area:info}
+.home .c-music{grid-area:music;display:flex;flex-direction:column}
+@media (orientation:portrait){
+  .home{grid-template-columns:1fr;grid-template-rows:auto auto auto;
+    grid-template-areas:"info" "nav" "music";height:auto}
+}
+
+/* info (relógio + velocidade) */
+.info{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bigclock{font-size:52px;font-weight:700;letter-spacing:-1px;line-height:1}
+.date{color:var(--mu);font-size:15px;margin-top:6px}
+.speed{text-align:right}
+.speed .v{font-size:52px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.speed .u{color:var(--mu);font-size:14px;margin-top:6px}
+.gpsbtn{background:var(--card2);border-radius:14px;padding:12px 14px;font-size:14px;font-weight:600}
+
+/* atalhos de apps */
+.apps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.appbtn{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:13px;color:var(--mu)}
+.appbtn .ic{width:100%;max-width:76px;aspect-ratio:1;border-radius:20px;display:grid;place-items:center;color:#fff}
+.appbtn .ic svg{width:44%;height:44%}
+
+/* busca + favoritos */
+.search{display:flex;gap:8px;margin-bottom:12px}
+.search input{font-size:17px;padding:14px 16px}
+.gobtn{background:var(--ac);border-radius:12px;padding:0 18px;font-weight:600;flex:none}
+.favs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;overflow:auto}
+.fav{background:var(--card2);border-radius:16px;padding:14px;text-align:left;display:flex;gap:12px;align-items:center;min-height:64px}
+.fav .fi{width:38px;height:38px;border-radius:50%;background:#26324a;display:grid;place-items:center;flex:none;color:#9cc2ff}
+.fav .fi svg{width:20px;height:20px}
+.fav b{display:block;font-size:16px}
+.fav small{display:block;color:var(--mu);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.fav .ft{min-width:0}
+
+/* música */
+.np{display:flex;gap:14px;align-items:center;min-width:0}
+.cover{width:84px;height:84px;border-radius:14px;background:var(--card2);flex:none;display:grid;place-items:center;overflow:hidden;color:var(--spot)}
+.cover img{width:100%;height:100%;object-fit:cover}
+.cover svg{width:40px;height:40px}
+.np .t{min-width:0}
+.np b{display:block;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np small{display:block;color:var(--mu);font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{height:4px;background:var(--line);border-radius:2px;margin:14px 0 6px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--spot)}
+.ctrls{display:flex;justify-content:center;gap:22px;align-items:center;margin-top:8px}
+.ctrls button{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--card2)}
+.ctrls .pp{width:68px;height:68px;background:var(--spot);color:#000}
+.ctrls svg{width:26px;height:26px}
+.pls{display:flex;gap:8px;overflow-x:auto;margin-top:12px;padding-bottom:2px}
+.pl{flex:none;background:var(--card2);border-radius:14px;padding:12px 16px;font-weight:600;font-size:14px;display:flex;gap:8px;align-items:center}
+.pl svg{width:16px;height:16px;color:var(--spot)}
+.hint{color:var(--mu);font-size:13px;line-height:1.45}
+.hint a{color:#9cc2ff}
+
+/* views secundárias */
+.page{display:flex;flex-direction:column;gap:10px;min-height:100%}
+.page h2{margin:4px 4px 2px;font-size:26px}
+.list{display:flex;flex-direction:column;gap:8px}
+.row{background:var(--card2);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;min-height:60px;text-align:left;width:100%}
+.row .grow{flex:1;min-width:0}
+.row b{display:block;font-size:16px}
+.row small{display:block;color:var(--mu);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{border-radius:12px;padding:10px 14px;font-weight:600;font-size:14px;flex:none}
+
+/* teclado telefone */
+.phone{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (orientation:portrait){.phone{grid-template-columns:1fr}}
+.dial{font-size:30px;text-align:center;letter-spacing:2px;min-height:44px;font-variant-numeric:tabular-nums;margin-bottom:8px}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.keys button{background:var(--card2);border-radius:16px;height:58px;font-size:24px;font-weight:600}
+.callbtn{background:#2ecc71 !important;color:#000}
+
+/* ajustes */
+.set .row{flex-wrap:wrap}
+.set .ed{display:grid;grid-template-columns:1fr 1.6fr auto;gap:8px;width:100%;align-items:center}
+@media (max-width:560px){.set .ed{grid-template-columns:1fr auto}.set .ed input:nth-child(2){grid-column:1/2}}
+.del{background:#3a1f22;color:#ff7b7b;width:44px;height:44px;border-radius:12px;display:grid;place-items:center}
+.add{background:var(--card2);border:1px dashed var(--line);border-radius:14px;padding:12px;font-weight:600;color:#9cc2ff}
+.seg{display:flex;background:var(--card2);border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;padding:10px;border-radius:9px;font-size:14px;font-weight:600;color:var(--mu)}
+.seg button.on{background:var(--ac);color:#fff}
+.tog{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.sw{width:52px;height:32px;border-radius:16px;background:var(--line);position:relative;flex:none;transition:.2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:var(--spot)}.sw.on::after{left:23px}
+.btn{background:var(--ac);border-radius:12px;padding:12px 16px;font-weight:600}
+.btn.g{background:var(--card2)}
+
+/* telas baixas (iPhone deitado) */
+@media (orientation:landscape) and (max-height:500px){
+  .card{padding:14px}
+  .bigclock,.speed .v{font-size:38px}
+  .date{font-size:13px;margin-top:4px}
+  .apps{margin-bottom:10px;gap:8px}
+  .appbtn{font-size:12px;gap:5px}.appbtn .ic{max-width:58px;border-radius:16px}
+  .search{margin-bottom:10px}.search input{padding:11px 14px;font-size:16px}
+  .fav{min-height:54px;padding:10px 12px}
+  .ttl{margin-bottom:8px}
+  .cover{width:58px;height:58px}
+  .np b{font-size:16px}.np small{font-size:13px}
+  .bar{margin:10px 0 4px}
+  .ctrls{gap:16px;margin-top:4px}.ctrls button{width:46px;height:46px}.ctrls .pp{width:56px;height:56px}
+  .pls{margin-top:10px}.pl{padding:9px 12px}
+  .dbtn{width:52px;height:52px}
+}
+
+/* folha de escolha + toast */
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.sheet.on{display:flex}
+.sheet .box{background:var(--card);border-radius:24px 24px 0 0;padding:20px 18px calc(20px + var(--sab));width:100%;max-width:640px}
+.sheet h3{margin:0 0 4px;font-size:20px}
+.sheet p{margin:0 0 16px;color:var(--mu);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.choices button{border-radius:16px;padding:18px 8px;font-weight:700;color:#000}
+.toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%) translateY(20px);opacity:0;
+  background:#2a2f37;padding:12px 18px;border-radius:14px;font-size:14px;transition:.25s;z-index:30;pointer-events:none;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="dock">
+    <div class="clk" id="dockClock">--:--</div>
+    <nav id="dock">
+      <button class="dbtn on" data-v="home" aria-label="Início"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></button>
+      <button class="dbtn" data-v="nav" aria-label="Navegação"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4.5 20.3l.7.7L12 18l6.8 3 .7-.7z"/></svg></button>
+      <button class="dbtn" data-v="music" aria-label="Música"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V6l11-2v12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="3"/><circle cx="17.5" cy="16" r="3"/></svg></button>
+      <button class="dbtn" data-v="phone" aria-label="Telefone"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg></button>
+      <button class="dbtn" data-v="settings" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    </nav>
+    <div class="dspacer" style="height:20px"></div>
+  </aside>
+
+  <main class="main">
+    <!-- INÍCIO -->
+    <section class="view on" id="v-home">
+      <div class="home">
+        <div class="card c-info">
+          <div class="info">
+            <div>
+              <div class="bigclock" id="bigClock">--:--</div>
+              <div class="date" id="bigDate"></div>
+            </div>
+            <div class="speed" id="speedBox"></div>
+          </div>
+        </div>
+
+        <div class="card c-nav">
+          <div class="apps">
+            <button class="appbtn" data-open="waze"><span class="ic" style="background:var(--waze)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a8 8 0 0 0-8 8c0 1.6.5 2.6 1.2 3.4-.5 1-1.3 1.6-2.2 1.9.9 1 2.4 1.6 4 1.6a2 2 0 0 0 3.9.6h3.2a2 2 0 0 0 3.9-.5A8 8 0 0 0 12 3zm-2.5 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm5 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM12 15c-1.7 0-3-1-3.4-2.2h1.4c.4.6 1.1 1 2 1s1.6-.4 2-1h1.4C15 14 13.7 15 12 15z"/></svg></span>Waze</button>
+            <button class="appbtn" data-open="gmaps"><span class="ic" style="background:var(--gmaps)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>Google Maps</button>
+            <button class="appbtn" data-open="spotify"><span class="ic" style="background:var(--spot)"><svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"><path d="M5 9c4.5-1.5 9.5-1 14 1.2M6 12.6c3.8-1.1 7.8-.7 11.2 1.1M7 16c3-.8 6-.5 8.6.9"/></svg></span>Spotify</button>
+            <button class="appbtn" data-open="whatsapp"><span class="ic" style="background:var(--wa)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.2 21.8l4.9-1.3A9.8 9.8 0 1 0 12 2.2zm5.4 13.8c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.7-.1l1-1.2c.2-.3.4-.2.7-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.3z"/></svg></span>WhatsApp</button>
+          </div>
+          <form class="search" id="homeSearch">
+            <input id="homeQ" placeholder="Para onde?" autocomplete="off" enterkeyhint="go">
+            <button class="gobtn" type="submit">Ir</button>
+          </form>
+          <div class="favs" id="homeFavs"></div>
+        </div>
+
+        <div class="card c-music" id="homeMusic"></div>
+      </div>
+    </section>
+
+    <!-- NAVEGAÇÃO -->
+    <section class="view" id="v-nav">
+      <div class="page">
+        <h2>Navegação</h2>
+        <div class="card">
+          <form class="search" id="navSearch" style="margin:0">
+            <input id="navQ" placeholder="Endereço, lugar ou CEP" autocomplete="off" enterkeyhint="go">
+            <button class="gobtn" type="submit">Ir</button>
+          </form>
+        </div>
+        <div class="card"><p class="ttl">Favoritos</p><div class="favs" id="navFavs"></div></div>
+        <div class="card"><p class="ttl">Recentes</p><div class="list" id="navRecent"></div></div>
+      </div>
+    </section>
+
+    <!-- MÚSICA -->
+    <section class="view" id="v-music">
+      <div class="page">
+        <h2>Música</h2>
+        <div class="card" id="musicMain"></div>
+        <div class="card"><p class="ttl">Suas playlists</p><div class="list" id="musicPls"></div></div>
+      </div>
+    </section>
+
+    <!-- TELEFONE -->
+    <section class="view" id="v-phone">
+      <div class="page">
+        <h2>Telefone</h2>
+        <div class="phone">
+          <div class="card"><p class="ttl">Contatos rápidos</p><div class="list" id="contacts"></div></div>
+          <div class="card">
+            <div class="dial" id="dial"></div>
+            <div class="keys" id="keys"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AJUSTES -->
+    <section class="view" id="v-settings">
+      <div class="page set" id="settings"></div>
+    </section>
+  </main>
+</div>
+
+<div class="sheet" id="sheet">
+  <div class="box">
+    <h3>Abrir rota com…</h3>
+    <p id="sheetDest"></p>
+    <div class="choices">
+      <button data-app="waze" style="background:var(--waze)">Waze</button>
+      <button data-app="gmaps" style="background:var(--gmaps)">Google Maps</button>
+      <button data-app="apple" style="background:#e9e9ee">Apple Mapas</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================== armazenamento ================== */
+const K = 'drivedeck_';
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(K+k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(K+k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(K+k); }catch(e){} }
+};
+const S = {
+  favs: store.get('favs', [{nome:'Casa',end:''},{nome:'Trabalho',end:''}]),
+  pls: store.get('pls', []),
+  contatos: store.get('contatos', []),
+  recentes: store.get('recentes', []),
+  navPadrao: store.get('navPadrao', 'ask'),
+  telaAcesa: store.get('telaAcesa', true),
+  gps: store.get('gps', false),
+  spClient: store.get('spClient', '')
+};
+const save = k => store.set(k, S[k]);
+
+/* ================== util ================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let toastT;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+
+/* Abre app nativo pelo esquema de URL; se não abrir em 1,6 s, usa o link web */
+function launch(appUrl, webUrl){
+  let left = false;
+  const onHide = () => { if(document.hidden) left = true; };
+  document.addEventListener('visibilitychange', onHide, {once:true});
+  try{ window.location.href = appUrl; }catch(e){}
+  if(webUrl) setTimeout(()=>{ if(!left && !document.hidden) window.location.href = webUrl; }, 1600);
+}
+
+const ICON_PIN = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>';
+const ICON_HOME = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg>';
+const ICON_WORK = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4h4a2 2 0 0 1 2 2v1h4a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4V6a2 2 0 0 1 2-2zm0 3h4V6h-4z"/></svg>';
+const ICON_NOTE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V6l11-2v12" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="6.5" cy="18" r="3"/><circle cx="17.5" cy="16" r="3"/></svg>';
+const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>';
+const ICON_PREV = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>';
+const ICON_NEXT = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>';
+const ICON_X = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+/* ================== relógio ================== */
+function tick(){
+  const d = new Date();
+  const hm = d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  $('#dockClock').textContent = hm; $('#bigClock').textContent = hm;
+  const dt = d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  $('#bigDate').textContent = dt.charAt(0).toUpperCase() + dt.slice(1);
+}
+setInterval(tick, 5000); tick();
+
+/* ================== velocímetro (GPS) ================== */
+let watchId = null, lastPos = null;
+const DIRS = ['N','NE','L','SE','S','SO','O','NO'];
+function renderSpeed(){
+  const box = $('#speedBox');
+  if(!S.gps){ box.innerHTML = '<button class="gpsbtn" id="gpsOn">Ativar velocímetro</button>'; $('#gpsOn').onclick = startGps; return; }
+  let kmh = '--', dir = '';
+  if(lastPos){
+    const sp = lastPos.coords.speed;
+    kmh = (sp==null || sp<0) ? '0' : Math.round(sp*3.6);
+    const h = lastPos.coords.heading;
+    if(h!=null && !isNaN(h) && sp>1) dir = ' · ' + DIRS[Math.round(h/45)%8];
+  }
+  box.innerHTML = `<div class="v">${kmh}</div><div class="u">km/h${dir}</div>`;
+}
+function startGps(){
+  if(!('geolocation' in navigator)){ toast('GPS indisponível neste navegador'); return; }
+  S.gps = true; save('gps'); renderSpeed();
+  if(watchId!==null) return;
+  watchId = navigator.geolocation.watchPosition(
+    p => { lastPos = p; renderSpeed(); },
+    e => { if(e.code===1){ S.gps=false; save('gps'); watchId=null; toast('Permita a localização nos Ajustes do iPhone'); } renderSpeed(); },
+    {enableHighAccuracy:true, maximumAge:1000, timeout:15000}
+  );
+}
+
+/* ================== tela sempre acesa ================== */
+let wakeLock = null;
+async function keepAwake(){
+  if(!S.telaAcesa || !('wakeLock' in navigator) || document.hidden) return;
+  try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden){ keepAwake(); spPoll(); tick(); } });
+
+/* ================== navegação ================== */
+function routeUrls(dest){
+  const q = encodeURIComponent(dest);
+  return {
+    waze:  [`waze://?q=${q}&navigate=yes`, `https://waze.com/ul?q=${q}&navigate=yes`],
+    gmaps: [`comgooglemaps://?daddr=${q}&directionsmode=driving`, `https://www.google.com/maps/dir/?api=1&destination=${q}&travelmode=driving`],
+    apple: [`maps://?daddr=${q}&dirflg=d`, `https://maps.apple.com/?daddr=${q}&dirflg=d`]
+  };
+}
+let pendingDest = '';
+function go(dest){
+  dest = (dest||'').trim();
+  if(!dest){ toast('Digite um destino'); return; }
+  S.recentes = [dest, ...S.recentes.filter(r => r.toLowerCase()!==dest.toLowerCase())].slice(0,8); save('recentes'); renderNav();
+  if(S.navPadrao==='ask'){ pendingDest = dest; $('#sheetDest').textContent = dest; $('#sheet').classList.add('on'); return; }
+  const u = routeUrls(dest)[S.navPadrao]; launch(u[0], u[1]);
+}
+$('#sheet').addEventListener('click', e => {
+  const b = e.target.closest('button[data-app]');
+  if(b){ const u = routeUrls(pendingDest)[b.dataset.app]; launch(u[0], u[1]); }
+  $('#sheet').classList.remove('on');
+});
+function favHtml(f, i){
+  const ic = /casa/i.test(f.nome) ? ICON_HOME : /trab/i.test(f.nome) ? ICON_WORK : ICON_PIN;
+  return `<button class="fav" data-fav="${i}"><span class="fi">${ic}</span><span class="ft"><b>${esc(f.nome)}</b><small>${f.end ? esc(f.end) : 'Toque para configurar'}</small></span></button>`;
+}
+function renderNav(){
+  const favs = S.favs.map(favHtml).join('') || '<p class="hint">Adicione favoritos em Ajustes.</p>';
+  $('#homeFavs').innerHTML = favs; $('#navFavs').innerHTML = favs;
+  $('#navRecent').innerHTML = S.recentes.length
+    ? S.recentes.map((r,i)=>`<button class="row" data-rec="${i}"><span class="fi" style="color:var(--mu)">${ICON_PIN}</span><span class="grow"><b>${esc(r)}</b></span></button>`).join('')
+    : '<p class="hint">Os destinos que você buscar aparecem aqui.</p>';
+}
+document.addEventListener('click', e => {
+  const f = e.target.closest('[data-fav]');
+  if(f){ const fav = S.favs[+f.dataset.fav]; if(!fav.end){ show('settings'); toast('Preencha o endereço de "'+fav.nome+'"'); return; } go(fav.end); return; }
+  const r = e.target.closest('[data-rec]'); if(r){ go(S.recentes[+r.dataset.rec]); return; }
+  const o = e.target.closest('[data-open]'); if(o){ openApp(o.dataset.open); return; }
+  const p = e.target.closest('[data-pl]'); if(p){ openPlaylist(S.pls[+p.dataset.pl]); return; }
+  const c = e.target.closest('[data-call]'); if(c){ window.location.href = 'tel:' + c.dataset.call; return; }
+});
+$('#homeSearch').onsubmit = e => { e.preventDefault(); go($('#homeQ').value); $('#homeQ').blur(); };
+$('#navSearch').onsubmit = e => { e.preventDefault(); go($('#navQ').value); $('#navQ').blur(); };
+
+function openApp(a){
+  const m = {
+    waze:['waze://','https://waze.com/ul'],
+    gmaps:['comgooglemaps://','https://www.google.com/maps'],
+    spotify:['spotify://','https://open.spotify.com'],
+    whatsapp:['whatsapp://','https://web.whatsapp.com']
+  }[a];
+  if(m) launch(m[0], m[1]);
+}
+
+/* ================== Spotify: atalhos ================== */
+function spUri(link){
+  link = (link||'').trim();
+  if(link.startsWith('spotify:')) return link;
+  const m = link.match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(playlist|album|artist|track|show|episode)\/([A-Za-z0-9]+)/);
+  return m ? `spotify:${m[1]}:${m[2]}` : '';
+}
+function openPlaylist(p){
+  const uri = spUri(p.link);
+  if(!uri){ toast('Link inválido — cole o link de compartilhamento do Spotify'); return; }
+  const web = 'https://open.spotify.com/' + uri.split(':').slice(1).join('/');
+  launch(uri, web);
+}
+
+/* ================== Spotify: controle (opcional, exige Premium) ================== */
+const SP = {
+  scope: 'user-read-playback-state user-modify-playback-state user-read-currently-playing',
+  redirect: () => location.origin + location.pathname,
+  tok: store.get('spTok', null),
+  now: null, lastErr: ''
+};
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+async function spLogin(){
+  if(!S.spClient){ toast('Informe o Client ID do Spotify'); return; }
+  if(!window.crypto || !crypto.subtle){ toast('Abra o app pelo endereço https para conectar'); return; }
+  const v = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  store.set('spVerifier', v);
+  const ch = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
+  const p = new URLSearchParams({response_type:'code', client_id:S.spClient, scope:SP.scope,
+    code_challenge_method:'S256', code_challenge:ch, redirect_uri:SP.redirect()});
+  window.location.href = 'https://accounts.spotify.com/authorize?' + p;
+}
+async function spTokenReq(body){
+  const r = await fetch('https://accounts.spotify.com/api/token', {method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams(body)});
+  if(!r.ok) throw new Error('token ' + r.status);
+  const j = await r.json();
+  SP.tok = {access:j.access_token, refresh:j.refresh_token || SP.tok?.refresh, exp:Date.now() + (j.expires_in-60)*1000};
+  store.set('spTok', SP.tok);
+}
+async function spCallback(){
+  const q = new URLSearchParams(location.search);
+  if(!q.get('code') && !q.get('error')) return;
+  history.replaceState(null, '', location.pathname);
+  if(q.get('error')){ toast('Spotify: acesso negado'); return; }
+  try{
+    await spTokenReq({grant_type:'authorization_code', code:q.get('code'), redirect_uri:SP.redirect(),
+      client_id:S.spClient, code_verifier:store.get('spVerifier','')});
+    toast('Spotify conectado');
+  }catch(e){ toast('Falha ao conectar o Spotify'); }
+}
+async function spApi(method, path){
+  if(!SP.tok) return null;
+  if(Date.now() > SP.tok.exp){
+    try{ await spTokenReq({grant_type:'refresh_token', refresh_token:SP.tok.refresh, client_id:S.spClient}); }
+    catch(e){ spLogout(); toast('Sessão do Spotify expirou, conecte de novo'); return null; }
+  }
+  const r = await fetch('https://api.spotify.com/v1' + path, {method, headers:{Authorization:'Bearer ' + SP.tok.access}});
+  if(r.status===204) return {};
+  if(r.status===403){ SP.lastErr = 'O controle exige Spotify Premium.'; return null; }
+  if(r.status===404){ SP.lastErr = 'Nenhum aparelho tocando. Abra o Spotify e dê play uma vez.'; return null; }
+  if(!r.ok) return null;
+  const t = await r.text(); return t ? JSON.parse(t) : {};
+}
+function spLogout(){ SP.tok = null; SP.now = null; store.del('spTok'); renderMusic(); renderSettings(); }
+let pollT = null;
+async function spPoll(){
+  clearTimeout(pollT);
+  if(!SP.tok || document.hidden) return;
+  try{ const j = await spApi('GET','/me/player'); if(j) { SP.now = j.item ? j : null; if(j.item) SP.lastErr=''; } }catch(e){}
+  renderMusic();
+  pollT = setTimeout(spPoll, 4000);
+}
+async function spCmd(c){
+  if(!SP.tok){ openApp('spotify'); return; }
+  const playing = SP.now?.is_playing;
+  const map = {pp: playing ? ['PUT','/me/player/pause'] : ['PUT','/me/player/play'], next:['POST','/me/player/next'], prev:['POST','/me/player/previous']};
+  const res = await spApi(...map[c]);
+  if(res===null && SP.lastErr) toast(SP.lastErr);
+  setTimeout(spPoll, 600);
+}
+
+function npHtml(big){
+  const n = SP.now, it = n?.item;
+  const cover = it?.album?.images?.[0]?.url;
+  const title = it ? esc(it.name) : (SP.tok ? 'Nada tocando' : 'Spotify');
+  const sub = it ? esc((it.artists||it.show&&[it.show]||[]).map(a=>a.name).join(', ')) : (SP.tok ? (SP.lastErr || 'Dê play no Spotify') : 'Toque em ▶ para abrir o app');
+  const pct = it && it.duration_ms ? Math.min(100, (n.progress_ms/it.duration_ms)*100) : 0;
+  const sz = big ? 'style="width:120px;height:120px"' : '';
+  return `<div class="np"><div class="cover" ${sz}>${cover ? `<img src="${esc(cover)}" alt="">` : ICON_NOTE}</div>
+    <div class="t"><b>${title}</b><small>${sub}</small></div></div>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="ctrls">
+      <button data-sp="prev" aria-label="Anterior">${ICON_PREV}</button>
+      <button class="pp" data-sp="pp" aria-label="Tocar/pausar">${n?.is_playing ? ICON_PAUSE : ICON_PLAY}</button>
+      <button data-sp="next" aria-label="Próxima">${ICON_NEXT}</button>
+    </div>`;
+}
+function renderMusic(){
+  const pls = S.pls.map((p,i)=>`<button class="pl" data-pl="${i}">${ICON_NOTE}${esc(p.nome)}</button>`).join('');
+  $('#homeMusic').innerHTML = `<p class="ttl">Tocando agora</p>${npHtml(false)}
+    ${pls ? `<div class="pls">${pls}</div>` : ''}`;
+  $('#musicMain').innerHTML = npHtml(true) + (SP.tok ? '' :
+    `<p class="hint" style="margin-top:14px">Os botões abrem o Spotify. Para ver a música e controlar daqui, conecte sua conta em <b>Ajustes</b> (exige Spotify Premium).</p>`);
+  $('#musicPls').innerHTML = S.pls.length
+    ? S.pls.map((p,i)=>`<button class="row" data-pl="${i}"><span style="color:var(--spot)">${ICON_NOTE}</span><span class="grow"><b>${esc(p.nome)}</b><small>${esc(p.link)}</small></span></button>`).join('')
+    : '<p class="hint">Adicione playlists em Ajustes colando o link de compartilhamento do Spotify.</p>';
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-sp]'); if(b) spCmd(b.dataset.sp); });
+
+/* ================== telefone ================== */
+let dialNum = '';
+function renderPhone(){
+  $('#contacts').innerHTML = S.contatos.length
+    ? S.contatos.map(c=>`<button class="row" data-call="${esc(c.tel.replace(/[^\d+]/g,''))}"><span class="grow"><b>${esc(c.nome)}</b><small>${esc(c.tel)}</small></span><span class="pill" style="background:#2ecc71;color:#000">Ligar</span></button>`).join('')
+    : '<p class="hint">Adicione contatos rápidos em Ajustes.</p>';
+  $('#dial').textContent = dialNum || ' ';
+}
+$('#keys').innerHTML = ['1','2','3','4','5','6','7','8','9','*','0','#'].map(k=>`<button data-k="${k}">${k}</button>`).join('')
+  + '<button data-k="del">⌫</button><button class="callbtn" data-k="call" style="grid-column:span 2">Ligar</button>';
+$('#keys').onclick = e => {
+  const k = e.target.closest('[data-k]')?.dataset.k; if(!k) return;
+  if(k==='del') dialNum = dialNum.slice(0,-1);
+  else if(k==='call'){ if(dialNum) window.location.href = 'tel:' + dialNum; }
+  else if(dialNum.length < 16) dialNum += k;
+  $('#dial').textContent = dialNum || ' ';
+};
+
+/* ================== ajustes ================== */
+function editList(key, fields, addLabel){
+  const rows = S[key].map((it,i)=>`<div class="row"><div class="ed">
+      ${fields.map(f=>`<input data-list="${key}" data-i="${i}" data-f="${f.k}" value="${esc(it[f.k])}" placeholder="${f.ph}" ${f.type?`type="${f.type}"`:''}>`).join('')}
+      <button class="del" data-rm="${key}" data-i="${i}" aria-label="Remover">${ICON_X}</button></div></div>`).join('');
+  return `<div class="list">${rows}<button class="add" data-addto="${key}">+ ${addLabel}</button></div>`;
+}
+function renderSettings(){
+  const spState = SP.tok
+    ? `<div class="tog"><span class="hint">Conta conectada.</span><button class="btn g" id="spOut">Desconectar</button></div>`
+    : `<input id="spClient" value="${esc(S.spClient)}" placeholder="Client ID do seu app no Spotify for Developers" style="margin-bottom:10px">
+       <div class="tog"><span class="hint">Redirect URI para cadastrar no Spotify:<br><b style="-webkit-user-select:text;user-select:text">${esc(SP.redirect())}</b></span><button class="btn" id="spIn">Conectar</button></div>`;
+  $('#settings').innerHTML = `
+    <h2>Ajustes</h2>
+    <div class="card"><p class="ttl">App de navegação padrão</p>
+      <div class="seg" id="navSeg">
+        ${[['ask','Perguntar'],['waze','Waze'],['gmaps','Google Maps'],['apple','Apple Mapas']].map(([v,l])=>`<button data-nv="${v}" class="${S.navPadrao===v?'on':''}">${l}</button>`).join('')}
+      </div></div>
+    <div class="card"><p class="ttl">Destinos favoritos</p>${editList('favs',[{k:'nome',ph:'Nome (ex.: Casa)'},{k:'end',ph:'Endereço completo'}],'Adicionar destino')}</div>
+    <div class="card"><p class="ttl">Playlists do Spotify</p>${editList('pls',[{k:'nome',ph:'Nome'},{k:'link',ph:'Link (Compartilhar → Copiar link)'}],'Adicionar playlist')}</div>
+    <div class="card"><p class="ttl">Contatos rápidos</p>${editList('contatos',[{k:'nome',ph:'Nome'},{k:'tel',ph:'Telefone',type:'tel'}],'Adicionar contato')}</div>
+    <div class="card"><div class="tog"><div><b>Manter tela acesa</b><div class="hint">Enquanto o DriveDeck estiver aberto</div></div><button class="sw ${S.telaAcesa?'on':''}" id="swWake" aria-label="Manter tela acesa"></button></div></div>
+    <div class="card"><p class="ttl">Spotify — controle no painel (opcional)</p>
+      <p class="hint" style="margin-top:0">Mostra a música tocando e os botões play/pausa/próxima sem sair do painel. Exige Spotify Premium e um app gratuito criado em developer.spotify.com.</p>
+      ${spState}</div>
+    <div class="card"><p class="ttl">Backup das configurações</p>
+      <textarea id="bk" rows="3" placeholder="Cole aqui um backup para restaurar"></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn g" id="bkCopy">Copiar backup</button><button class="btn g" id="bkLoad">Restaurar</button></div></div>
+    <p class="hint" style="text-align:center;margin:6px 0 14px">DriveDeck · uso pessoal · configure antes de sair com o carro</p>`;
+  $('#navSeg').onclick = e => { const b=e.target.closest('[data-nv]'); if(!b) return; S.navPadrao=b.dataset.nv; save('navPadrao'); renderSettings(); };
+  $('#swWake').onclick = () => { S.telaAcesa=!S.telaAcesa; save('telaAcesa'); if(S.telaAcesa) keepAwake(); else if(wakeLock){ wakeLock.release(); wakeLock=null; } renderSettings(); };
+  if(SP.tok) $('#spOut').onclick = spLogout;
+  else{ $('#spClient').oninput = e => { S.spClient = e.target.value.trim(); save('spClient'); }; $('#spIn').onclick = spLogin; }
+  $('#bkCopy').onclick = async () => {
+    const data = JSON.stringify({favs:S.favs,pls:S.pls,contatos:S.contatos,navPadrao:S.navPadrao,spClient:S.spClient});
+    try{ await navigator.clipboard.writeText(data); toast('Backup copiado'); }catch(e){ $('#bk').value = data; toast('Copie o texto acima'); }
+  };
+  $('#bkLoad').onclick = () => {
+    try{ const d = JSON.parse($('#bk').value); ['favs','pls','contatos','navPadrao','spClient'].forEach(k=>{ if(d[k]!==undefined){ S[k]=d[k]; save(k); } }); renderAll(); toast('Configurações restauradas'); }
+    catch(e){ toast('Backup inválido'); }
+  };
+}
+$('#settings').addEventListener('input', e => {
+  const t = e.target; if(!t.dataset.list) return;
+  S[t.dataset.list][+t.dataset.i][t.dataset.f] = t.value; save(t.dataset.list);
+  renderNav(); renderMusic(); renderPhone();
+});
+$('#settings').addEventListener('click', e => {
+  const rm = e.target.closest('[data-rm]');
+  if(rm){ S[rm.dataset.rm].splice(+rm.dataset.i,1); save(rm.dataset.rm); renderAll(); return; }
+  const ad = e.target.closest('[data-addto]');
+  if(ad){ const k=ad.dataset.addto; S[k].push(k==='favs'?{nome:'',end:''}:k==='pls'?{nome:'',link:''}:{nome:'',tel:''}); save(k); renderSettings();
+    const ins = document.querySelectorAll(`[data-list="${k}"][data-f]`); ins[ins.length - (k==='favs'||k==='pls'||k==='contatos'?2:1)]?.focus(); }
+});
+
+/* ================== troca de telas ================== */
+function show(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on', x.id==='v-'+v));
+  document.querySelectorAll('.dbtn').forEach(x=>x.classList.toggle('on', x.dataset.v===v));
+  $('#v-'+v).scrollTop = 0;
+}
+$('#dock').onclick = e => { const b=e.target.closest('[data-v]'); if(b) show(b.dataset.v); };
+
+function renderAll(){ renderNav(); renderMusic(); renderPhone(); renderSettings(); renderSpeed(); }
+
+/* ================== início ================== */
+(async function init(){
+  renderAll();
+  await spCallback();
+  renderMusic(); renderSettings(); spPoll();
+  if(S.gps) startGps();
+  document.addEventListener('click', keepAwake, {once:true});
+  keepAwake();
+  if('serviceWorker' in navigator && location.protocol==='https:'){
+    try{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }catch(e){}
+  }
+})();
+</script>
+</body>
+</html>
