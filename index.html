@@ -197,6 +197,29 @@ svg{display:block}
 .btn{background:var(--ac);border-radius:12px;padding:12px 16px;font-weight:600}
 .btn.g{background:var(--card2)}
 
+/* navegação curva a curva */
+.nb{display:none;background:#17804a;border-radius:18px;padding:12px 12px 12px 10px;gap:12px;align-items:center;color:#fff;box-shadow:0 4px 18px rgba(0,0,0,.35)}
+#mapWrap.navigating .nb{display:flex}
+#mapWrap.navigating .route,#mapWrap.navigating .msearch,#mapWrap.navigating .chips{display:none!important}
+.nbi{width:56px;height:56px;flex:none;display:grid;place-items:center}
+.nbi svg{width:54px;height:54px}
+.nbt{flex:1;min-width:0}
+.nbt b{display:block;font-size:30px;line-height:1.05;font-variant-numeric:tabular-nums}
+.nbt span{font-size:17px;font-weight:600;line-height:1.25;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nbt small{display:block;font-size:13px;opacity:.85;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nbt small:empty{display:none}
+.nbv{width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.25);display:grid;place-items:center;flex:none}
+.nbv svg{width:22px;height:22px}
+.navbar{display:none;flex:1;min-width:0;background:rgba(21,24,29,.96);border-radius:16px;padding:8px 8px 8px 14px;align-items:center;gap:10px;min-height:64px}
+#mapWrap.navigating .navbar{display:flex}
+.nvt{flex:1;min-width:0;font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nvt small{display:block;color:var(--mu);font-weight:400;font-size:13px;margin-top:2px}
+.nvx{background:#d93a3a;color:#fff;border-radius:12px;padding:12px 16px;font-weight:700;flex:none}
+.rstart{width:100%;margin-top:10px;background:var(--ac);border-radius:12px;padding:13px;font-weight:700;font-size:15px}
+body.navon .navpage{grid-template-columns:1fr}
+body.navon .navside{display:none}
+@media (orientation:portrait){ body.navon .navpage{grid-template-rows:calc(100vh - 130px)} }
+
 /* telas baixas (iPhone deitado) */
 @media (orientation:landscape) and (max-height:500px){
   .card{padding:14px}
@@ -213,6 +236,10 @@ svg{display:block}
   .ctrls{gap:16px;margin-top:4px}.ctrls button{width:46px;height:46px}.ctrls .pp{width:56px;height:56px}
   .pls{margin-top:10px}.pl{padding:9px 12px}
   .dbtn{width:52px;height:52px}
+  .nb{padding:8px 10px 8px 8px;gap:8px}
+  .nbi{width:44px;height:44px}.nbi svg{width:42px;height:42px}
+  .nbt b{font-size:24px}.nbt span{font-size:15px;-webkit-line-clamp:1}
+  .nbt small{display:none}
 }
 
 /* folha de escolha + toast */
@@ -260,11 +287,17 @@ svg{display:block}
                 <button class="gobtn" type="submit">Ir</button>
               </form>
               <div class="route" id="routeBox"></div>
+              <div class="nb" id="navBanner">
+                <div class="nbi" id="nbIcon"></div>
+                <div class="nbt"><b id="nbDist"></b><span id="nbText"></span><small id="nbNext"></small></div>
+                <button class="nbv" id="nbVoice" aria-label="Voz liga/desliga"></button>
+              </div>
             </div>
             <button class="recenter" id="recenter" aria-label="Centralizar no carro"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4.5 20.3l.7.7L12 18l6.8 3 .7-.7z"/></svg></button>
             <div class="mbottom">
               <div class="speedo" id="speedBox"></div>
               <div class="chips" id="homeFavs"></div>
+              <div class="navbar" id="navBar"><div class="nvt" id="navEta"></div><button class="nvx" id="navEnd">Encerrar</button></div>
             </div>
           </div>
         </div>
@@ -354,6 +387,7 @@ const S = {
   gps: store.get('gps', false),
   spClient: store.get('spClient', ''),
   mapaPrimeiro: store.get('mapaPrimeiro', true),
+  voz: store.get('voz', true),
   lastLL: store.get('lastLL', null)
 };
 const save = k => store.set(k, S[k]);
@@ -414,7 +448,7 @@ function startGps(){
 }
 
 /* ================== mapa (OpenStreetMap + CARTO, grátis) ================== */
-let map = null, meMarker = null, follow = true, routeLine = null, destMarker = null, route = null, target = null, routeSeq = 0;
+let nav = null, map = null, meMarker = null, follow = true, routeLine = null, destMarker = null, route = null, target = null, routeSeq = 0;
 function initMap(){
   if(typeof L === 'undefined'){ $('#map').innerHTML = '<div class="nomap">Mapa indisponível sem internet.<br>Os atalhos continuam funcionando.</div>'; return; }
   map = L.map('map', {zoomControl:false, attributionControl:true}).setView(S.lastLL || [-23.5015,-47.4526], S.lastLL ? 15 : 12);
@@ -442,7 +476,7 @@ function onPos(p){
   if(!meMarker) meMarker = L.marker(ll, {icon:meIcon(h), interactive:false, zIndexOffset:1000}).addTo(map);
   else { meMarker.setLatLng(ll); meMarker.setIcon(meIcon(h)); }
   if(follow) map.setView(ll, Math.max(map.getZoom(), 15), {animate:true});
-  if(route) routeProgress(ll);
+  if(nav) navTick(ll); else if(route) routeProgress(ll);
 }
 function updRecenter(){ $('#recenter').classList.toggle('on', !follow); }
 $('#recenter').onclick = () => {
@@ -467,14 +501,18 @@ async function geocode(q){
   return res;
 }
 async function getRoute(from, to){
-  const u = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to.lon},${to.lat}?overview=full&geometries=geojson`;
+  const u = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to.lon},${to.lat}?overview=false&steps=true&geometries=geojson`;
   const r = await fetch(u); if(!r.ok) throw new Error('rota');
   const j = await r.json();
   if(j.code !== 'Ok' || !j.routes || !j.routes.length) return null;
-  const rt = j.routes[0], c = rt.geometry.coordinates.map(x => [x[1], x[0]]);
+  const rt = j.routes[0], steps = rt.legs[0].steps, c = [], starts = [];
+  steps.forEach(st => {
+    const g = st.geometry.coordinates.map(x => [x[1], x[0]]);
+    if(!c.length){ starts.push(0); c.push(...g); } else { starts.push(c.length-1); c.push(...g.slice(1)); }
+  });
   const rem = new Array(c.length).fill(0);   // distância restante a partir de cada ponto
   for(let i = c.length-2; i >= 0; i--) rem[i] = rem[i+1] + L.latLng(c[i]).distanceTo(c[i+1]);
-  return {coords:c, rem, dist:rt.distance, dur:rt.duration, distLeft:rt.distance, durLeft:rt.duration};
+  return {coords:c, rem, starts, steps, dist:rt.distance, dur:rt.duration, distLeft:rt.distance, durLeft:rt.duration};
 }
 const fmtDist = m => m >= 1000 ? (m/1000).toFixed(m >= 10000 ? 0 : 1).replace('.', ',') + ' km' : Math.max(10, Math.round(m/10)*10) + ' m';
 const fmtDur = s => { const m = Math.max(1, Math.round(s/60)); return m < 60 ? m + ' min' : Math.floor(m/60) + ' h ' + String(m%60).padStart(2,'0') + ' min'; };
@@ -495,6 +533,7 @@ function renderRouteBox(){
   if(!target){ box.classList.remove('on'); box.innerHTML = ''; return; }
   box.innerHTML = `<div class="rt"><div class="t"><b>${esc(target.label)}</b><small id="rSub">${esc(routeSub())}</small></div>
       <button class="rx" id="rClear" aria-label="Fechar rota">${ICON_X}</button></div>
+    ${route ? '<button class="rstart" id="rStart">▶ Navegar no DriveDeck</button>' : ''}
     <div class="rgo"><button data-app="waze" style="background:var(--waze)">Waze</button><button data-app="gmaps" style="background:var(--gmaps)">Google Maps</button><button data-app="apple" style="background:#e9e9ee">Apple</button></div>`;
   box.classList.add('on');
 }
@@ -503,11 +542,27 @@ function fitRoute(){
   const top = $('.mtop').offsetHeight + 24;
   map.fitBounds(routeLine.getBounds(), {paddingTopLeft:[30, top], paddingBottomRight:[70, 90]});
 }
+// acha o ponto da rota mais perto do carro (projeção no trecho) e a distância que falta
+function locate(ll){
+  const c = route.coords, k = Math.cos(ll[0]*Math.PI/180), M = 111320, px = ll[1]*k, py = ll[0];
+  const seg = (a, b) => {
+    let best = {d:Infinity, i:a, rem:route.rem[a]};
+    for(let i = a; i < b-1; i++){
+      const ax = c[i][1]*k, ay = c[i][0], bx = c[i+1][1]*k, by = c[i+1][0], dx = bx-ax, dy = by-ay, L2 = dx*dx + dy*dy;
+      let t = L2 ? ((px-ax)*dx + (py-ay)*dy) / L2 : 0; t = Math.max(0, Math.min(1, t));
+      const qx = ax + t*dx, qy = ay + t*dy, d = Math.hypot(px-qx, py-qy)*M;
+      if(d < best.d) best = {d, i, rem: route.rem[i+1] + Math.hypot(bx-qx, by-qy)*M};
+    }
+    return best;
+  };
+  const from = nav ? nav.lastIdx : 0;
+  let r = seg(Math.max(0, from-10), Math.min(c.length, from+500));
+  if(r.d > 60){ const g = seg(0, c.length); if(g.d < r.d) r = g; }
+  return r;
+}
 function routeProgress(ll){
-  const c = route.coords, k = Math.cos(ll[0]*Math.PI/180), step = c.length > 4000 ? 3 : 1;
-  let bi = 0, bd = Infinity;
-  for(let i = 0; i < c.length; i += step){ const d = (c[i][0]-ll[0])**2 + ((c[i][1]-ll[1])*k)**2; if(d < bd){ bd = d; bi = i; } }
-  route.distLeft = route.rem[bi]; route.durLeft = route.dur * (route.distLeft / Math.max(route.dist, 1));
+  const r = locate(ll);
+  route.distLeft = r.rem; route.durLeft = route.dur * (r.rem / Math.max(route.dist, 1));
   const el = $('#rSub'); if(el) el.textContent = routeSub();
 }
 function clearRoute(){
@@ -536,6 +591,7 @@ async function previewRoute(query, label){
   if(rt) fitRoute(); else map.setView([g.lat, g.lon], 15);
 }
 $('#routeBox').addEventListener('click', e => {
+  if(e.target.closest('#rStart')){ startNav(); return; }
   if(e.target.closest('#rClear')){ routeSeq++; clearRoute(); follow = true; updRecenter();
     if(map && lastPos) map.setView([lastPos.coords.latitude, lastPos.coords.longitude], 16); return; }
   const b = e.target.closest('[data-app]'); if(!b || !target) return;
@@ -550,6 +606,133 @@ async function keepAwake(){
   try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
 }
 document.addEventListener('visibilitychange', () => { if(!document.hidden){ keepAwake(); spPoll(); tick(); } });
+
+/* ================== navegação curva a curva ================== */
+const MOD = {'right':'à direita','left':'à esquerda','slight right':'levemente à direita','slight left':'levemente à esquerda',
+  'sharp right':'acentuadamente à direita','sharp left':'acentuadamente à esquerda','straight':'em frente','uturn':'o retorno'};
+const FEM = /^(rua|r\.|avenida|av\.?|rodovia|rod\.|estrada|alameda|al\.|travessa|tv\.|praça|pça\.?|marginal|via|ponte|ladeira|passagem|servidão|vila|vicinal)(\s|$)/i;
+const MASC = /^(viaduto|largo|anel|acesso|contorno|boulevard|parque|caminho|elevado|túnel|trevo|complexo|retorno)(\s|$)/i;
+const art = n => FEM.test(n) ? {em:'na', por:'pela'} : MASC.test(n) ? {em:'no', por:'pelo'} : {em:'em', por:'por'};
+const stName = st => (st.name || st.ref || '').trim();
+const lowerFirst = t => t.charAt(0).toLowerCase() + t.slice(1);
+function instr(st){
+  const m = st.maneuver, t = m.type, mod = m.modifier || '', n = stName(st), a = art(n), d = MOD[mod] || '';
+  const on = n ? ` ${a.em} ${n}` : '';
+  const seg = n ? `Continue ${a.por} ${n}` : 'Continue em frente';
+  switch(t){
+    case 'depart': return n ? `Siga ${a.por} ${n}` : 'Siga em frente';
+    case 'arrive': return /right/.test(mod) ? 'O destino está à direita' : /left/.test(mod) ? 'O destino está à esquerda' : 'Você chegou ao destino';
+    case 'turn': return mod === 'uturn' ? 'Faça o retorno' + on : mod === 'straight' ? 'Siga em frente' + on : `Vire ${d}${on}`;
+    case 'end of road': return `No fim da via, vire ${d}${on}`;
+    case 'continue': return mod === 'uturn' ? 'Faça o retorno' + on : (!mod || mod === 'straight') ? seg : `Continue ${d}${on}`;
+    case 'new name': case 'notification': case 'use lane': return seg;
+    case 'merge': return n ? `Entre${on}` : `Entre ${d || 'na via'}`;
+    case 'on ramp': return `Pegue a alça ${d}` + (n ? ` para ${n}` : '');
+    case 'off ramp': { const dest = (st.destinations || n || '').split(',')[0]; return `Pegue a saída ${d}` + (dest ? ` para ${dest}` : ''); }
+    case 'fork': return `Na bifurcação, mantenha-se ${d.replace(/^(levemente|acentuadamente) /, '')}${on}`;
+    case 'roundabout': case 'rotary': return m.exit ? `Na rotatória, pegue a ${m.exit}ª saída` + (n ? ` para ${n}` : '') : 'Entre na rotatória' + (n ? ` e siga para ${n}` : '');
+    case 'roundabout turn': return `Na rotatória, vire ${d}${on}`;
+    case 'exit roundabout': case 'exit rotary': return n ? `Saia da rotatória para ${n}` : 'Saia da rotatória';
+    default: return seg;
+  }
+}
+function arrowSvg(st){
+  const t = st.maneuver.type, mod = st.maneuver.modifier || 'straight';
+  const S0 = 'fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"';
+  if(t === 'arrive') return `<svg viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-2 4 2 4H6" ${S0}/></svg>`;
+  if(/roundabout|rotary/.test(t)) return `<svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="4.5" ${S0}/><path d="M12 21v-6.5M15.5 7l3.5-3.5M15 3.5h4v4" ${S0}/></svg>`;
+  if(mod === 'uturn') return `<svg viewBox="0 0 24 24"><path d="M15 21V9a4 4 0 0 0-8 0v4M3.5 10 7 13.5 10.5 10" ${S0}/></svg>`;
+  if(mod === 'right' || mod === 'left') return `<svg viewBox="0 0 24 24" style="transform:scaleX(${mod === 'left' ? -1 : 1})"><path d="M7 21v-8a4 4 0 0 1 4-4h8M15 5l4 4-4 4" ${S0}/></svg>`;
+  const rot = {'slight right':40,'sharp right':135,'slight left':-40,'sharp left':-135}[mod] || 0;
+  return `<svg viewBox="0 0 24 24" style="transform:rotate(${rot}deg)"><path d="M12 21V4M5.5 10.5 12 4l6.5 6.5" ${S0}/></svg>`;
+}
+const shownDist = m => m >= 1000 ? (m/1000).toFixed(1).replace('.', ',') + ' km' : (m < 100 ? Math.max(10, Math.round(m/10)*10) : Math.round(m/50)*50) + ' m';
+function spokenDist(m){
+  if(m >= 1000){ const k = Math.round(m/100)/10; return k === 1 ? '1 quilômetro' : String(k).replace('.', ',') + ' quilômetros'; }
+  return (m < 100 ? Math.max(10, Math.round(m/10)*10) : Math.round(m/50)*50) + ' metros';
+}
+
+/* voz */
+let ptVoice = null;
+function pickVoice(){ try{ const vs = speechSynthesis.getVoices(); ptVoice = vs.find(v => v.lang === 'pt-BR') || vs.find(v => /^pt/i.test(v.lang)) || null; }catch(e){} }
+if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(t){
+  if(!S.voz || !('speechSynthesis' in window)) return;
+  try{
+    const u = new SpeechSynthesisUtterance(t.replace(/\bAv\.\s/g, 'Avenida ').replace(/\bR\.\s/g, 'Rua ').replace(/\bDr\.\s/g, 'Doutor ').replace(/\bProf\.\s/g, 'Professor ').replace(/\bSP-0?(\d+)/g, 'SP $1'));
+    u.lang = 'pt-BR'; if(ptVoice) u.voice = ptVoice;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }catch(e){}
+}
+function unlockVoice(){ try{ const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }catch(e){} }
+const ICON_SPK = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const ICON_MUTE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 9.5l5 5M21.5 9.5l-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+function renderVoiceBtn(){ $('#nbVoice').innerHTML = S.voz ? ICON_SPK : ICON_MUTE; }
+$('#nbVoice').onclick = () => { S.voz = !S.voz; save('voz'); renderVoiceBtn(); if(S.voz){ unlockVoice(); speak('Voz ligada'); } else try{ speechSynthesis.cancel(); }catch(e){} };
+
+function startNav(){
+  if(!route || !lastPos){ toast('Ative o GPS e aguarde a rota'); return; }
+  nav = {lastIdx:0, ann:{}, off:0, lastReroute:0, started:false};
+  unlockVoice(); renderVoiceBtn();
+  $('#mapWrap').classList.add('navigating'); document.body.classList.add('navon');
+  follow = true; updRecenter();
+  const ll = [lastPos.coords.latitude, lastPos.coords.longitude];
+  map.setView(ll, 17);
+  keepAwake();
+  navTick(ll);
+}
+function stopNav(msg){
+  nav = null;
+  $('#mapWrap').classList.remove('navigating'); document.body.classList.remove('navon');
+  routeSeq++; clearRoute(); follow = true; updRecenter();
+  if(map){ setTimeout(() => map.invalidateSize(), 60); if(lastPos) map.setView([lastPos.coords.latitude, lastPos.coords.longitude], 16); }
+  if(msg) toast(msg);
+}
+$('#navEnd').onclick = () => { try{ speechSynthesis.cancel(); }catch(e){} stopNav(); };
+async function reroute(ll){
+  nav.lastReroute = Date.now(); nav.off = 0;
+  speak('Recalculando a rota'); $('#nbText').textContent = 'Recalculando a rota…';
+  let rt = null; try{ rt = await getRoute(ll, {lat:target.lat, lon:target.lon}); }catch(e){}
+  if(!rt || !nav) return;
+  route = rt; nav.lastIdx = 0; nav.ann = {}; nav.started = false;
+  if(routeLine) routeLine.setLatLngs(rt.coords);
+  if(lastPos) navTick([lastPos.coords.latitude, lastPos.coords.longitude]);
+}
+function navTick(ll){
+  if(!nav || !route) return;
+  const r = locate(ll); nav.lastIdx = r.i;
+  route.distLeft = r.rem; route.durLeft = route.dur * (r.rem / Math.max(route.dist, 1));
+  const acc = (lastPos && lastPos.coords.accuracy) || 20;
+  if(r.d > Math.max(50, acc*1.5)){ if(++nav.off >= 3 && Date.now() - nav.lastReroute > 12000){ reroute(ll); return; } } else nav.off = 0;
+  if(r.rem < 30){ speak('Você chegou ao destino'); stopNav('Você chegou ao destino'); return; }
+  const st = route.starts, steps = route.steps;
+  let k = 0; while(k+1 < st.length && st[k+1] <= r.i) k++;
+  const n = Math.min(k+1, steps.length-1), next = steps[n];
+  const dTo = Math.max(0, r.rem - route.rem[st[n]]);
+  $('#nbIcon').innerHTML = arrowSvg(next);
+  $('#nbDist').textContent = shownDist(dTo);
+  $('#nbText').textContent = instr(next);
+  const after = steps[n+1];
+  $('#nbNext').textContent = (after && dTo < 400 && (route.rem[st[n]] - route.rem[st[n+1]]) < 250) ? 'Logo depois: ' + lowerFirst(instr(after)) : '';
+  const eta = new Date(Date.now() + route.durLeft*1000).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+  $('#navEta').innerHTML = `${esc(fmtDur(route.durLeft))} · ${esc(fmtDist(route.distLeft))}<small>Chegada ${eta} · ${esc(target.label)}</small>`;
+  announce(n, next, dTo, k);
+}
+function announce(n, st, d, k){
+  const a = nav.ann[n] || (nav.ann[n] = {});
+  const v = Math.max((lastPos && lastPos.coords.speed) || 0, 0);
+  const farD = v > 22 ? 1000 : 500, nearD = v > 14 ? 300 : 150, nowD = Math.max(25, v*3);
+  const txt = instr(st), arrive = st.maneuver.type === 'arrive';
+  if(!nav.started){
+    nav.started = true; a.far = 1; if(d <= nearD) a.near = 1;
+    const first = route.steps[k].maneuver.type === 'depart' ? instr(route.steps[k]) + '. ' : '';
+    speak(`${first}Em ${spokenDist(d)}, ${lowerFirst(txt)}`); return;
+  }
+  if(arrive) { if(d <= nearD && !a.near){ a.near = 1; speak(`Em ${spokenDist(d)}, ${lowerFirst(txt)}`); } return; }
+  if(d <= nowD && !a.now){ a.now = a.near = a.far = 1; speak('Agora, ' + lowerFirst(txt)); }
+  else if(d <= nearD && d > nowD && !a.near){ a.near = a.far = 1; speak(`Em ${spokenDist(d)}, ${lowerFirst(txt)}`); }
+  else if(d <= farD && d > nearD + 100 && !a.far){ a.far = 1; speak(`Em ${spokenDist(d)}, ${lowerFirst(txt)}`); }
+}
 
 /* ================== navegação ================== */
 function routeUrls(dest){
@@ -760,6 +943,7 @@ function renderSettings(){
         ${[['ask','Perguntar'],['waze','Waze'],['gmaps','Google Maps'],['apple','Apple Mapas']].map(([v,l])=>`<button data-nv="${v}" class="${S.navPadrao===v?'on':''}">${l}</button>`).join('')}
       </div></div>
     <div class="card"><div class="tog"><div><b>Ver a rota no mapa antes</b><div class="hint">Desligado: abre direto no app de navegação padrão</div></div><button class="sw ${S.mapaPrimeiro?'on':''}" id="swMap" aria-label="Ver a rota no mapa antes"></button></div></div>
+    <div class="card"><div class="tog"><div><b>Voz nas instruções</b><div class="hint">"Em 300 metros, vire à direita…"</div></div><button class="sw ${S.voz?'on':''}" id="swVoz" aria-label="Voz nas instruções"></button></div></div>
     <div class="card"><p class="ttl">Destinos favoritos</p>${editList('favs',[{k:'nome',ph:'Nome (ex.: Casa)'},{k:'end',ph:'Endereço completo'}],'Adicionar destino')}</div>
     <div class="card"><p class="ttl">Playlists do Spotify</p>${editList('pls',[{k:'nome',ph:'Nome'},{k:'link',ph:'Link (Compartilhar → Copiar link)'}],'Adicionar playlist')}</div>
     <div class="card"><p class="ttl">Contatos rápidos</p>${editList('contatos',[{k:'nome',ph:'Nome'},{k:'tel',ph:'Telefone',type:'tel'}],'Adicionar contato')}</div>
@@ -770,8 +954,9 @@ function renderSettings(){
     <div class="card"><p class="ttl">Backup das configurações</p>
       <textarea id="bk" rows="3" placeholder="Cole aqui um backup para restaurar"></textarea>
       <div style="display:flex;gap:8px;margin-top:10px"><button class="btn g" id="bkCopy">Copiar backup</button><button class="btn g" id="bkLoad">Restaurar</button></div></div>
-    <p class="hint" style="text-align:center;margin:6px 0 14px">DriveDeck <b>versão 4</b> · uso pessoal · configure antes de sair com o carro</p>`;
+    <p class="hint" style="text-align:center;margin:6px 0 14px">DriveDeck <b>versão 5</b> · uso pessoal · configure antes de sair com o carro</p>`;
   $('#navSeg').onclick = e => { const b=e.target.closest('[data-nv]'); if(!b) return; S.navPadrao=b.dataset.nv; save('navPadrao'); renderSettings(); };
+  $('#swVoz').onclick = () => { S.voz=!S.voz; save('voz'); if(S.voz) unlockVoice(); renderSettings(); };
   $('#swMap').onclick = () => { S.mapaPrimeiro=!S.mapaPrimeiro; save('mapaPrimeiro'); renderSettings(); };
   $('#swWake').onclick = () => { S.telaAcesa=!S.telaAcesa; save('telaAcesa'); if(S.telaAcesa) keepAwake(); else if(wakeLock){ wakeLock.release(); wakeLock=null; } renderSettings(); };
   if(SP.tok) $('#spOut').onclick = spLogout;
