@@ -13,15 +13,23 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <title>DriveDeck</title>
+<script>try{var t=JSON.parse(localStorage.getItem('drivedeck_tema')||'"escuro"');if(t==='auto')t=matchMedia('(prefers-color-scheme: light)').matches?'claro':'escuro';document.documentElement.dataset.theme=t==='claro'?'light':'dark'}catch(e){}</script>
 <style>
 :root{
   --bg:#0b0d10; --card:#15181d; --card2:#1c2026; --line:#262b33;
   --tx:#f2f4f7; --mu:#8a929e; --ac:#2f7cf6;
   --waze:#33ccff; --gmaps:#34a853; --spot:#1db954; --wa:#25d366; --amaps:#ff5a5f;
   --r:22px;
+  --glass:rgba(21,24,29,.95); --mapbg:#1b1f25; --acc2:#9cc2ff; --fibg:#26324a; --ring:#3a414c;
+  --delbg:#3a1f22; --delfg:#ff7b7b;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
   --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
 }
+:root[data-theme=light]{--bg:#e8ebf0;--card:#ffffff;--card2:#eff1f4;--line:#d8dde4;--tx:#15181d;--mu:#5c6572;
+  --glass:rgba(255,255,255,.96);--mapbg:#e6e4e0;--acc2:#2f6fdc;--fibg:#e2ebfb;--ring:#cfd5dd;--delbg:#fde3e3;--delfg:#c62828}
+:root[data-theme=light] .darktiles{filter:none}
+:root[data-theme=light] .card,:root[data-theme=light] .dock{box-shadow:0 1px 4px rgba(20,30,50,.07)}
+:root[data-theme=light] body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:#1d2127;z-index:50}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;
@@ -59,24 +67,75 @@ svg{display:block}
 .card{background:var(--card);border-radius:var(--r);padding:18px;min-width:0}
 .ttl{font-size:13px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px}
 .home{display:grid;gap:10px;height:100%;
-  grid-template-columns:1.4fr 1fr;grid-template-rows:auto 1fr;
-  grid-template-areas:"map apps" "map music"}
+  grid-template-columns:1.4fr 1fr;grid-template-rows:auto auto 1fr;
+  grid-template-areas:"map apps" "map wx" "map music"}
+.home.lay-music{grid-template-columns:1.45fr 1fr;grid-template-rows:auto 1fr auto;
+  grid-template-areas:"music wx" "music map" "music apps"}
 .home .c-info{grid-area:info;display:none}
-.home .c-map{grid-area:map}
+.home .c-map{grid-area:map;min-height:120px}
 .home .c-apps{grid-area:apps;padding:12px 14px}
 .home .c-apps .apps{margin:0}
+.home .c-wx{grid-area:wx;padding:12px 16px}
 .home .c-music{grid-area:music;display:flex;flex-direction:column;min-height:0;overflow:auto}
 @media (orientation:portrait){
-  .home{grid-template-columns:1fr;grid-template-rows:auto 48vh auto auto;height:auto;
-    grid-template-areas:"info" "map" "apps" "music"}
+  .home{grid-template-columns:1fr;grid-template-rows:auto 48vh auto auto auto;height:auto;
+    grid-template-areas:"info" "map" "wx" "apps" "music"}
+  .home.lay-music{grid-template-columns:1fr;grid-template-rows:auto auto auto 32vh auto;
+    grid-template-areas:"info" "music" "wx" "map" "apps"}
   .home .c-info{display:block}
 }
+
+/* música grande + fila */
+.mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.mhead .ttl{margin:0}
+.exp{width:36px;height:36px;border-radius:10px;background:var(--card2);display:grid;place-items:center;color:var(--mu);flex:none}
+.exp svg,.mexp svg{width:20px;height:20px}
+.mbig{display:grid;grid-template-columns:1fr 1fr;gap:16px;flex:1;min-height:0}
+.mnow{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-width:0}
+.cv-big{width:min(160px,34vh);height:min(160px,34vh);border-radius:18px;background:var(--card2);overflow:hidden;display:grid;place-items:center;color:var(--spot);flex:none}
+.cv-big img{width:100%;height:100%;object-fit:cover}
+.cv-big svg{width:46%;height:46%}
+.mnow b{display:block;font-size:19px;margin-top:12px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mnow small{display:block;color:var(--mu);font-size:14px;margin-top:3px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mnow .bar{width:100%}
+.mq{display:flex;flex-direction:column;min-height:0;min-width:0}
+.qlist{display:flex;flex-direction:column;gap:8px;overflow:auto;min-height:0;flex:1}
+.qi{display:flex;gap:10px;align-items:center;min-width:0}
+.qi img,.qi .qph{width:44px;height:44px;border-radius:8px;flex:none;object-fit:cover;background:var(--card2)}
+.qi div{min-width:0}
+.qi b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qi small{display:block;font-size:12px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (orientation:portrait){ .mbig{grid-template-columns:1fr} .qlist{max-height:300px} }
+
+/* clima */
+.wx{display:flex;align-items:center;gap:12px;min-width:0}
+.wxi{width:46px;height:46px;flex:none}
+.wxi svg{width:100%;height:100%}
+.wxt{flex:none}
+.wxt b{font-size:32px;line-height:1;font-weight:700}
+.wxs{min-width:0;flex:1}
+.wxs span{display:block;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wxs small{display:block;color:var(--mu);font-size:13px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wxd{display:none;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.wxd div{background:var(--card2);border-radius:12px;padding:8px 6px;text-align:center;font-size:14px}
+.wxd small{display:block;color:var(--mu);font-size:12px}
+.wxd svg{width:28px;height:28px;margin:4px auto}
+@media (orientation:portrait){ .wxd{display:grid} }
+
+/* mapa pequeno (modo música grande) */
+#mapWrap.mini .mtop,#mapWrap.mini .chips{display:none}
+#mapWrap.mini .recenter{bottom:10px;width:40px;height:40px}
+#mapWrap.mini .recenter svg{width:20px;height:20px}
+#mapWrap.mini .speedo .sp{width:50px;height:50px}
+#mapWrap.mini .speedo .sp b{font-size:17px}
+.mexp{display:none;position:absolute;top:10px;right:10px;z-index:500;width:40px;height:40px;border-radius:12px;background:var(--glass);place-items:center;color:var(--tx)}
+#mapWrap.mini .mexp{display:grid}
 
 /* mapa */
 .c-map{position:relative;padding:0;overflow:hidden;min-height:0}
 #mapWrap{position:absolute;inset:0}
-#map{position:absolute;inset:0;background:#1b1f25}
-.leaflet-container{background:#1b1f25;font:inherit}
+#map{position:absolute;inset:0;background:var(--mapbg)}
+.leaflet-container{background:var(--mapbg);font:inherit}
 .darktiles{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.55)}
 .leaflet-control-attribution{background:rgba(0,0,0,.45)!important;color:#9aa!important;font-size:9px!important}
 .leaflet-control-attribution a{color:#bcc!important}
@@ -86,8 +145,8 @@ svg{display:block}
 .msearch{margin:0}
 .mtop.routing .msearch{display:none}
 .row .fi{width:32px;height:32px;display:grid;place-items:center;flex:none}.row .fi svg{width:20px;height:20px}
-.msearch input{background:rgba(21,24,29,.94);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.route{display:none;background:rgba(21,24,29,.96);border-radius:16px;padding:12px}
+.msearch input{background:var(--glass);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.route{display:none;background:var(--glass);border-radius:16px;padding:12px}
 .route.on{display:block}
 .route .rt{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .route .t{min-width:0}
@@ -99,14 +158,14 @@ svg{display:block}
 .mbottom{position:absolute;left:10px;right:10px;bottom:10px;z-index:500;display:flex;gap:8px;align-items:flex-end;pointer-events:none}
 .mbottom>*{pointer-events:auto}
 .speedo{flex:none}
-.speedo .sp{width:64px;height:64px;border-radius:50%;background:rgba(21,24,29,.96);border:3px solid #3a414c;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.speedo .sp{width:64px;height:64px;border-radius:50%;background:var(--glass);border:3px solid var(--ring);display:flex;flex-direction:column;align-items:center;justify-content:center}
 .speedo .sp b{font-size:23px;line-height:1;font-variant-numeric:tabular-nums}
 .speedo .sp small{font-size:10px;color:var(--mu)}
-.speedo .gpsbtn{background:rgba(21,24,29,.96)}
+.speedo .gpsbtn{background:var(--glass)}
 .chips{display:flex;gap:6px;overflow-x:auto;flex:1;min-width:0;justify-content:flex-start}
-.chip{flex:none;background:rgba(21,24,29,.96);border-radius:14px;padding:11px 14px;font-weight:600;font-size:14px;display:flex;gap:6px;align-items:center}
-.chip svg{width:16px;height:16px;color:#9cc2ff}
-.recenter{position:absolute;right:10px;bottom:84px;z-index:500;width:48px;height:48px;border-radius:50%;background:rgba(21,24,29,.96);display:grid;place-items:center;color:#9cc2ff}
+.chip{flex:none;background:var(--glass);border-radius:14px;padding:11px 14px;font-weight:600;font-size:14px;display:flex;gap:6px;align-items:center}
+.chip svg{width:16px;height:16px;color:var(--acc2)}
+.recenter{position:absolute;right:10px;bottom:84px;z-index:500;width:48px;height:48px;border-radius:50%;background:var(--glass);display:grid;place-items:center;color:var(--acc2)}
 .recenter.on{background:var(--ac);color:#fff}
 .recenter svg{width:24px;height:24px}
 .me svg{width:30px;height:30px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
@@ -134,10 +193,10 @@ svg{display:block}
 /* busca + favoritos */
 .search{display:flex;gap:8px;margin-bottom:12px}
 .search input{font-size:17px;padding:14px 16px}
-.gobtn{background:var(--ac);border-radius:12px;padding:0 18px;font-weight:600;flex:none}
+.gobtn{color:#fff;background:var(--ac);border-radius:12px;padding:0 18px;font-weight:600;flex:none}
 .favs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;overflow:auto}
 .fav{background:var(--card2);border-radius:16px;padding:14px;text-align:left;display:flex;gap:12px;align-items:center;min-height:64px}
-.fav .fi{width:38px;height:38px;border-radius:50%;background:#26324a;display:grid;place-items:center;flex:none;color:#9cc2ff}
+.fav .fi{width:38px;height:38px;border-radius:50%;background:var(--fibg);display:grid;place-items:center;flex:none;color:var(--acc2)}
 .fav .fi svg{width:20px;height:20px}
 .fav b{display:block;font-size:16px}
 .fav small{display:block;color:var(--mu);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -161,7 +220,7 @@ svg{display:block}
 .pl{flex:none;background:var(--card2);border-radius:14px;padding:12px 16px;font-weight:600;font-size:14px;display:flex;gap:8px;align-items:center}
 .pl svg{width:16px;height:16px;color:var(--spot)}
 .hint{color:var(--mu);font-size:13px;line-height:1.45}
-.hint a{color:#9cc2ff}
+.hint a{color:var(--acc2)}
 
 /* views secundárias */
 .page{display:flex;flex-direction:column;gap:10px;min-height:100%}
@@ -185,8 +244,8 @@ svg{display:block}
 .set .row{flex-wrap:wrap}
 .set .ed{display:grid;grid-template-columns:1fr 1.6fr auto;gap:8px;width:100%;align-items:center}
 @media (max-width:560px){.set .ed{grid-template-columns:1fr auto}.set .ed input:nth-child(2){grid-column:1/2}}
-.del{background:#3a1f22;color:#ff7b7b;width:44px;height:44px;border-radius:12px;display:grid;place-items:center}
-.add{background:var(--card2);border:1px dashed var(--line);border-radius:14px;padding:12px;font-weight:600;color:#9cc2ff}
+.del{background:var(--delbg);color:var(--delfg);width:44px;height:44px;border-radius:12px;display:grid;place-items:center}
+.add{background:var(--card2);border:1px dashed var(--line);border-radius:14px;padding:12px;font-weight:600;color:var(--acc2)}
 .seg{display:flex;background:var(--card2);border-radius:12px;padding:4px;gap:4px}
 .seg button{flex:1;padding:10px;border-radius:9px;font-size:14px;font-weight:600;color:var(--mu)}
 .seg button.on{background:var(--ac);color:#fff}
@@ -194,8 +253,8 @@ svg{display:block}
 .sw{width:52px;height:32px;border-radius:16px;background:var(--line);position:relative;flex:none;transition:.2s}
 .sw::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:.2s}
 .sw.on{background:var(--spot)}.sw.on::after{left:23px}
-.btn{background:var(--ac);border-radius:12px;padding:12px 16px;font-weight:600}
-.btn.g{background:var(--card2)}
+.btn{color:#fff;background:var(--ac);border-radius:12px;padding:12px 16px;font-weight:600}
+.btn.g{background:var(--card2);color:var(--tx)}
 
 /* navegação curva a curva */
 .nb{display:none;background:#17804a;border-radius:18px;padding:12px 12px 12px 10px;gap:12px;align-items:center;color:#fff;box-shadow:0 4px 18px rgba(0,0,0,.35)}
@@ -210,12 +269,12 @@ svg{display:block}
 .nbt small:empty{display:none}
 .nbv{width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.25);display:grid;place-items:center;flex:none}
 .nbv svg{width:22px;height:22px}
-.navbar{display:none;flex:1;min-width:0;background:rgba(21,24,29,.96);border-radius:16px;padding:8px 8px 8px 14px;align-items:center;gap:10px;min-height:64px}
+.navbar{display:none;flex:1;min-width:0;background:var(--glass);border-radius:16px;padding:8px 8px 8px 14px;align-items:center;gap:10px;min-height:64px}
 #mapWrap.navigating .navbar{display:flex}
 .nvt{flex:1;min-width:0;font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nvt small{display:block;color:var(--mu);font-weight:400;font-size:13px;margin-top:2px}
 .nvx{background:#d93a3a;color:#fff;border-radius:12px;padding:12px 16px;font-weight:700;flex:none}
-.rstart{width:100%;margin-top:10px;background:var(--ac);border-radius:12px;padding:13px;font-weight:700;font-size:15px}
+.rstart{color:#fff;width:100%;margin-top:10px;background:var(--ac);border-radius:12px;padding:13px;font-weight:700;font-size:15px}
 body.navon .navpage{grid-template-columns:1fr}
 body.navon .navside{display:none}
 @media (orientation:portrait){ body.navon .navpage{grid-template-rows:calc(100vh - 130px)} }
@@ -236,6 +295,9 @@ body.navon .navside{display:none}
   .ctrls{gap:16px;margin-top:4px}.ctrls button{width:46px;height:46px}.ctrls .pp{width:56px;height:56px}
   .pls{margin-top:10px}.pl{padding:9px 12px}
   .dbtn{width:52px;height:52px}
+  .home .c-wx{padding:10px 14px}.wxi{width:38px;height:38px}.wxt b{font-size:26px}
+  .cv-big{width:min(120px,30vh);height:min(120px,30vh)}.mnow b{font-size:17px;margin-top:8px}
+  .mhead{margin-bottom:6px}
   .nb{padding:8px 10px 8px 8px;gap:8px}
   .nbi{width:44px;height:44px}.nbi svg{width:42px;height:42px}
   .nbt b{font-size:24px}.nbt span{font-size:15px;-webkit-line-clamp:1}
@@ -251,7 +313,7 @@ body.navon .navside{display:none}
 .choices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .choices button{border-radius:16px;padding:18px 8px;font-weight:700;color:#000}
 .toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%) translateY(20px);opacity:0;
-  background:#2a2f37;padding:12px 18px;border-radius:14px;font-size:14px;transition:.25s;z-index:30;pointer-events:none;max-width:90vw;text-align:center}
+  background:#2a2f37;color:#fff;padding:12px 18px;border-radius:14px;font-size:14px;transition:.25s;z-index:30;pointer-events:none;max-width:90vw;text-align:center}
 .toast.on{opacity:1;transform:translateX(-50%)}
 </style>
 </head>
@@ -293,6 +355,7 @@ body.navon .navside{display:none}
                 <button class="nbv" id="nbVoice" aria-label="Voz liga/desliga"></button>
               </div>
             </div>
+            <button class="mexp" data-layout="mapa" aria-label="Mapa grande"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button>
             <button class="recenter" id="recenter" aria-label="Centralizar no carro"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4.5 20.3l.7.7L12 18l6.8 3 .7-.7z"/></svg></button>
             <div class="mbottom">
               <div class="speedo" id="speedBox"></div>
@@ -311,6 +374,7 @@ body.navon .navside{display:none}
           </div>
         </div>
 
+        <div class="card c-wx" id="wxCard"></div>
         <div class="card c-music" id="homeMusic"></div>
       </div>
     </section>
@@ -388,6 +452,8 @@ const S = {
   spClient: store.get('spClient', ''),
   mapaPrimeiro: store.get('mapaPrimeiro', true),
   voz: store.get('voz', true),
+  layout: store.get('layout', 'mapa'),
+  tema: store.get('tema', 'escuro'),
   lastLL: store.get('lastLL', null)
 };
 const save = k => store.set(k, S[k]);
@@ -471,6 +537,7 @@ const destIcon = () => L.divIcon({className:'', iconSize:[34,44], iconAnchor:[17
 function onPos(p){
   const ll = [p.coords.latitude, p.coords.longitude];
   S.lastLL = ll; save('lastLL');
+  wxLoad();
   if(!map) return;
   const h = (p.coords.speed > 1) ? p.coords.heading : null;
   if(!meMarker) meMarker = L.marker(ll, {icon:meIcon(h), interactive:false, zIndexOffset:1000}).addTo(map);
@@ -674,7 +741,7 @@ function startNav(){
   if(!route || !lastPos){ toast('Ative o GPS e aguarde a rota'); return; }
   nav = {lastIdx:0, ann:{}, off:0, lastReroute:0, started:false};
   unlockVoice(); renderVoiceBtn();
-  $('#mapWrap').classList.add('navigating'); document.body.classList.add('navon');
+  $('#mapWrap').classList.add('navigating'); document.body.classList.add('navon'); applyLayout();
   follow = true; updRecenter();
   const ll = [lastPos.coords.latitude, lastPos.coords.longitude];
   map.setView(ll, 17);
@@ -683,7 +750,7 @@ function startNav(){
 }
 function stopNav(msg){
   nav = null;
-  $('#mapWrap').classList.remove('navigating'); document.body.classList.remove('navon');
+  $('#mapWrap').classList.remove('navigating'); document.body.classList.remove('navon'); applyLayout();
   routeSeq++; clearRoute(); follow = true; updRecenter();
   if(map){ setTimeout(() => map.invalidateSize(), 60); if(lastPos) map.setView([lastPos.coords.latitude, lastPos.coords.longitude], 16); }
   if(msg) toast(msg);
@@ -865,7 +932,7 @@ let pollT = null;
 async function spPoll(){
   clearTimeout(pollT);
   if(!SP.tok || document.hidden) return;
-  try{ const j = await spApi('GET','/me/player'); if(j) { SP.now = j.item ? j : null; if(j.item) SP.lastErr=''; } }catch(e){}
+  try{ const j = await spApi('GET','/me/player'); if(j) { SP.now = j.item ? j : null; if(j.item) SP.lastErr=''; } if(musicBig()) await spQueue(); }catch(e){}
   renderMusic();
   pollT = setTimeout(spPoll, 4000);
 }
@@ -878,26 +945,59 @@ async function spCmd(c){
   setTimeout(spPoll, 600);
 }
 
-function npHtml(big){
-  const n = SP.now, it = n?.item;
-  const cover = it?.album?.images?.[0]?.url;
-  const title = it ? esc(it.name) : (SP.tok ? 'Nada tocando' : 'Spotify');
-  const sub = it ? esc((it.artists||it.show&&[it.show]||[]).map(a=>a.name).join(', ')) : (SP.tok ? (SP.lastErr || 'Dê play no Spotify') : 'Toque em ▶ para abrir o app');
-  const pct = it && it.duration_ms ? Math.min(100, (n.progress_ms/it.duration_ms)*100) : 0;
-  const sz = big ? 'style="width:120px;height:120px"' : '';
-  return `<div class="np"><div class="cover" ${sz}>${cover ? `<img src="${esc(cover)}" alt="">` : ICON_NOTE}</div>
-    <div class="t"><b>${title}</b><small>${sub}</small></div></div>
-    <div class="bar"><i style="width:${pct}%"></i></div>
-    <div class="ctrls">
+const ICON_EXP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>';
+const ICON_COL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>';
+function npInfo(){
+  const n = SP.now, it = n?.item, im = it?.album?.images || it?.images || [];
+  return {
+    cover: (im[0] || {}).url,
+    title: it ? esc(it.name) : (SP.tok ? 'Nada tocando' : 'Spotify'),
+    sub: it ? esc((it.artists || (it.show ? [it.show] : [])).map(a => a.name).join(', ')) : (SP.tok ? (SP.lastErr || 'Dê play no Spotify') : 'Toque em ▶ para abrir o app'),
+    pct: it && it.duration_ms ? Math.min(100, (n.progress_ms/it.duration_ms)*100) : 0,
+    playing: !!n?.is_playing
+  };
+}
+const ctrlsHtml = playing => `<div class="ctrls">
       <button data-sp="prev" aria-label="Anterior">${ICON_PREV}</button>
-      <button class="pp" data-sp="pp" aria-label="Tocar/pausar">${n?.is_playing ? ICON_PAUSE : ICON_PLAY}</button>
+      <button class="pp" data-sp="pp" aria-label="Tocar/pausar">${playing ? ICON_PAUSE : ICON_PLAY}</button>
       <button data-sp="next" aria-label="Próxima">${ICON_NEXT}</button>
     </div>`;
+function npHtml(big){
+  const f = npInfo(), sz = big ? 'style="width:120px;height:120px"' : '';
+  return `<div class="np"><div class="cover" ${sz}>${f.cover ? `<img src="${esc(f.cover)}" alt="">` : ICON_NOTE}</div>
+    <div class="t"><b>${f.title}</b><small>${f.sub}</small></div></div>
+    <div class="bar"><i style="width:${f.pct}%"></i></div>` + ctrlsHtml(f.playing);
+}
+function npBig(){
+  const f = npInfo();
+  return `<div class="mnow"><div class="cv-big">${f.cover ? `<img src="${esc(f.cover)}" alt="">` : ICON_NOTE}</div>
+    <b>${f.title}</b><small>${f.sub}</small><div class="bar"><i style="width:${f.pct}%"></i></div>${ctrlsHtml(f.playing)}</div>`;
+}
+function queueHtml(){
+  if(!SP.tok) return '<p class="hint" style="margin:0">Conecte o Spotify em Ajustes para ver a fila.</p>';
+  if(!SP.queue || !SP.queue.length) return '<p class="hint" style="margin:0">A fila aparece aqui quando houver música tocando.</p>';
+  return SP.queue.map(q => {
+    const im = q.album?.images || q.images || [], src = (im[im.length-1] || im[0] || {}).url;
+    const who = q.artists ? q.artists.map(a => a.name).join(', ') : (q.show?.name || '');
+    return `<div class="qi">${src ? `<img src="${esc(src)}" alt="" loading="lazy">` : '<span class="qph"></span>'}<div><b>${esc(q.name)}</b><small>${esc(who)}</small></div></div>`;
+  }).join('');
+}
+const musicBig = () => S.layout === 'musica' && !nav;
+async function spQueue(){
+  const id = SP.now?.item?.id || '';
+  if(SP.qT && Date.now() - SP.qT < 15000 && id === SP.qId) return;
+  SP.qT = Date.now(); SP.qId = id;
+  try{ const j = await spApi('GET', '/me/player/queue'); if(j && j.queue) SP.queue = j.queue.slice(0, 10); }catch(e){}
 }
 function renderMusic(){
+  const big = musicBig();
   const pls = S.pls.map((p,i)=>`<button class="pl" data-pl="${i}">${ICON_NOTE}${esc(p.nome || 'Playlist')}</button>`).join('');
-  $('#homeMusic').innerHTML = `<p class="ttl">Tocando agora</p>${npHtml(false)}
-    ${pls ? `<div class="pls">${pls}</div>` : ''}`;
+  const head = `<div class="mhead"><p class="ttl">Tocando agora</p><button class="exp" data-layout="${big ? 'mapa' : 'musica'}" aria-label="${big ? 'Diminuir' : 'Aumentar'} o card de música">${big ? ICON_COL : ICON_EXP}</button></div>`;
+  const oldQ = document.querySelector('#homeMusic .qlist'), qTop = oldQ ? oldQ.scrollTop : 0;
+  $('#homeMusic').innerHTML = big
+    ? head + `<div class="mbig">${npBig()}<div class="mq"><p class="ttl">A seguir</p><div class="qlist">${queueHtml()}</div>${pls ? `<div class="pls">${pls}</div>` : ''}</div></div>`
+    : head + npHtml(false) + (pls ? `<div class="pls">${pls}</div>` : '');
+  const nq = document.querySelector('#homeMusic .qlist'); if(nq) nq.scrollTop = qTop;
   $('#musicMain').innerHTML = npHtml(true) + (SP.tok ? '' :
     `<p class="hint" style="margin-top:14px">Os botões abrem o Spotify. Para ver a música e controlar daqui, conecte sua conta em <b>Ajustes</b> (exige Spotify Premium).</p>`);
   $('#musicPls').innerHTML = S.pls.length
@@ -905,6 +1005,98 @@ function renderMusic(){
     : '<p class="hint">Adicione playlists em Ajustes colando o link de compartilhamento do Spotify.</p>';
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-sp]'); if(b) spCmd(b.dataset.sp); });
+
+/* ================== layout da tela inicial ================== */
+function applyLayout(){
+  const big = musicBig();
+  $('.home').classList.toggle('lay-music', big);
+  $('#mapWrap').classList.toggle('mini', big && $('#mapWrap').parentNode.id === 'homeMapSlot');
+  renderMusic();
+  if(big && SP.tok){ SP.qT = 0; spPoll(); }
+  if(map) setTimeout(() => { map.invalidateSize(); if(routeLine && !follow) fitRoute(); }, 80);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-layout]'); if(!b) return;
+  S.layout = b.dataset.layout; save('layout'); applyLayout(); renderSettings();
+});
+
+/* ================== tema claro/escuro ================== */
+const mqLight = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+function applyTheme(){
+  const light = S.tema === 'claro' || (S.tema === 'auto' && mqLight && mqLight.matches);
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  const m = document.querySelector('meta[name=theme-color]'); if(m) m.content = light ? '#e8ebf0' : '#0b0d10';
+}
+if(mqLight){ try{ mqLight.addEventListener('change', () => { if(S.tema === 'auto') applyTheme(); }); }catch(e){} }
+
+/* ================== previsão do tempo (Open-Meteo, grátis) ================== */
+const WX = {data: store.get('wx', null), busy: false};
+function wxDesc(c){
+  if(c === 0) return 'Céu limpo'; if(c === 1) return 'Predomínio de sol'; if(c === 2) return 'Parcialmente nublado'; if(c === 3) return 'Nublado';
+  if(c === 45 || c === 48) return 'Neblina'; if(c >= 51 && c <= 57) return 'Garoa'; if(c === 61) return 'Chuva fraca'; if(c === 63) return 'Chuva';
+  if(c === 65) return 'Chuva forte'; if(c === 66 || c === 67) return 'Chuva congelante'; if((c >= 71 && c <= 77) || c === 85 || c === 86) return 'Neve';
+  if(c === 80) return 'Pancadas de chuva fracas'; if(c === 81) return 'Pancadas de chuva'; if(c === 82) return 'Pancadas fortes de chuva';
+  if(c === 95) return 'Trovoadas'; if(c >= 96) return 'Trovoadas com granizo'; return 'Tempo variável';
+}
+function wxIcon(c, day){
+  const sun = '<circle cx="12" cy="12" r="4.6" fill="#f6b40e"/><g stroke="#f6b40e" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></g>';
+  const moon = '<path d="M15.5 3.5a8.5 8.5 0 1 0 5 13.6A7 7 0 0 1 15.5 3.5z" fill="#c3cdee"/>';
+  const cloud = (y, col) => `<path transform="translate(0 ${y})" d="M7 19h10.5a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.4A3.3 3.3 0 0 0 7 19z" fill="${col}"/>`;
+  const behind = day ? `<g transform="translate(-2 -4) scale(.78)">${sun}</g>` : `<g transform="translate(-1 -3) scale(.7)">${moon}</g>`;
+  let b;
+  if(c === 0) b = day ? sun : moon;
+  else if(c <= 2) b = behind + cloud(1, '#b4bdca');
+  else if(c === 3) b = cloud(-1, '#a3adbb');
+  else if(c === 45 || c === 48) b = '<g stroke="#a3adbb" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M3 12h18M5 16h14"/></g>';
+  else if(c >= 95) b = cloud(-4, '#8d98a9') + '<path d="M13 14.5l-3 4.5h3l-1.5 4" fill="none" stroke="#f6c40e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+  else if((c >= 71 && c <= 77) || c === 85 || c === 86) b = cloud(-4, '#a3adbb') + '<g fill="#9fb8d8"><circle cx="8" cy="19.5" r="1.4"/><circle cx="12" cy="21.5" r="1.4"/><circle cx="16" cy="19.5" r="1.4"/></g>';
+  else b = cloud(-4, '#97a3b4') + '<g stroke="#3d9bff" stroke-width="2" stroke-linecap="round"><path d="M8.5 18l-1 3.5M12.5 18l-1 3.5M16.5 18l-1 3.5"/></g>';
+  return `<svg viewBox="0 0 24 24">${b}</svg>`;
+}
+async function wxLoad(force){
+  const ll = lastPos ? [lastPos.coords.latitude, lastPos.coords.longitude] : S.lastLL;
+  if(!ll || WX.busy){ renderWx(); return; }
+  const d = WX.data, moved = !d || Math.abs(d.lat - ll[0]) + Math.abs(d.lon - ll[1]) > 0.05;
+  if(!force && d && !moved && Date.now() - d.t < 15*60*1000){ return; }
+  WX.busy = true;
+  try{
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${ll[0].toFixed(3)}&longitude=${ll[1].toFixed(3)}`
+      + '&current=temperature_2m,apparent_temperature,weather_code,is_day&hourly=precipitation_probability'
+      + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=3&timezone=auto';
+    const r = await fetch(u); if(!r.ok) throw new Error('clima');
+    const j = await r.json();
+    let city = (d && !moved) ? d.city : '';
+    if(!city){
+      try{
+        const g = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${ll[0]}&lon=${ll[1]}&zoom=10&accept-language=pt-BR`);
+        const a = (await g.json()).address || {}; city = a.city || a.town || a.village || a.municipality || a.county || '';
+      }catch(e){}
+    }
+    let rain3 = null;
+    const H = j.hourly, h0 = H && H.time ? H.time.findIndex(t => t.slice(0,13) === String(j.current.time).slice(0,13)) : -1;
+    if(h0 >= 0) rain3 = Math.max(...H.precipitation_probability.slice(h0, h0 + 4).map(x => x || 0));
+    WX.data = {t:Date.now(), lat:ll[0], lon:ll[1], city, cur:j.current, daily:j.daily, rain3};
+    store.set('wx', WX.data);
+  }catch(e){}
+  WX.busy = false;
+  renderWx();
+}
+function renderWx(){
+  const el = $('#wxCard'), d = WX.data;
+  if(!d){
+    el.innerHTML = `<div class="wx"><div class="wxi">${wxIcon(2, 1)}</div><div class="wxs"><span>Previsão do tempo</span><small>${S.gps ? 'Carregando…' : 'Ative o GPS para ver o clima do local'}</small></div></div>`;
+    return;
+  }
+  const c = d.cur, dy = d.daily, R = Math.round;
+  const rain = d.rain3 != null ? ` · chuva ${d.rain3}%` : '';
+  const days = dy.time.slice(0, 3).map((t, i) => {
+    const lab = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : new Date(t + 'T12:00').toLocaleDateString('pt-BR', {weekday:'short'}).replace('.', '');
+    return `<div><small>${lab}</small>${wxIcon(dy.weather_code[i], 1)}<b>${R(dy.temperature_2m_max[i])}°</b> <span style="color:var(--mu)">${R(dy.temperature_2m_min[i])}°</span><small>chuva ${dy.precipitation_probability_max[i] ?? 0}%</small></div>`;
+  }).join('');
+  el.innerHTML = `<div class="wx"><div class="wxi">${wxIcon(c.weather_code, c.is_day)}</div><div class="wxt"><b>${R(c.temperature_2m)}°</b></div>
+    <div class="wxs"><span>${wxDesc(c.weather_code)}</span><small>${esc(d.city || 'Local atual')} · ↑${R(dy.temperature_2m_max[0])}° ↓${R(dy.temperature_2m_min[0])}°${rain}</small></div></div>
+    <div class="wxd">${days}</div>`;
+}
 
 /* ================== telefone ================== */
 let dialNum = '';
@@ -938,6 +1130,13 @@ function renderSettings(){
        <div class="tog"><span class="hint">Redirect URI para cadastrar no Spotify:<br><b style="-webkit-user-select:text;user-select:text">${esc(SP.redirect())}</b></span><button class="btn" id="spIn">Conectar</button></div>`;
   $('#settings').innerHTML = `
     <h2>Ajustes</h2>
+    <div class="card"><p class="ttl">Aparência</p>
+      <div class="seg" id="temaSeg" style="margin-bottom:10px">
+        ${[['escuro','Escuro'],['claro','Claro'],['auto','Automático']].map(([v,l])=>`<button data-tm="${v}" class="${S.tema===v?'on':''}">${l}</button>`).join('')}
+      </div>
+      <div class="seg" id="laySeg">
+        ${[['mapa','Mapa grande'],['musica','Spotify grande']].map(([v,l])=>`<button data-ly="${v}" class="${S.layout===v?'on':''}">${l}</button>`).join('')}
+      </div></div>
     <div class="card"><p class="ttl">App de navegação padrão</p>
       <div class="seg" id="navSeg">
         ${[['ask','Perguntar'],['waze','Waze'],['gmaps','Google Maps'],['apple','Apple Mapas']].map(([v,l])=>`<button data-nv="${v}" class="${S.navPadrao===v?'on':''}">${l}</button>`).join('')}
@@ -954,8 +1153,10 @@ function renderSettings(){
     <div class="card"><p class="ttl">Backup das configurações</p>
       <textarea id="bk" rows="3" placeholder="Cole aqui um backup para restaurar"></textarea>
       <div style="display:flex;gap:8px;margin-top:10px"><button class="btn g" id="bkCopy">Copiar backup</button><button class="btn g" id="bkLoad">Restaurar</button></div></div>
-    <p class="hint" style="text-align:center;margin:6px 0 14px">DriveDeck <b>versão 5</b> · uso pessoal · configure antes de sair com o carro</p>`;
+    <p class="hint" style="text-align:center;margin:6px 0 14px">DriveDeck <b>versão 6</b> · uso pessoal · configure antes de sair com o carro</p>`;
   $('#navSeg').onclick = e => { const b=e.target.closest('[data-nv]'); if(!b) return; S.navPadrao=b.dataset.nv; save('navPadrao'); renderSettings(); };
+  $('#temaSeg').onclick = e => { const b=e.target.closest('[data-tm]'); if(!b) return; S.tema=b.dataset.tm; save('tema'); applyTheme(); renderSettings(); };
+  $('#laySeg').onclick = e => { const b=e.target.closest('[data-ly]'); if(!b) return; S.layout=b.dataset.ly; save('layout'); applyLayout(); renderSettings(); };
   $('#swVoz').onclick = () => { S.voz=!S.voz; save('voz'); if(S.voz) unlockVoice(); renderSettings(); };
   $('#swMap').onclick = () => { S.mapaPrimeiro=!S.mapaPrimeiro; save('mapaPrimeiro'); renderSettings(); };
   $('#swWake').onclick = () => { S.telaAcesa=!S.telaAcesa; save('telaAcesa'); if(S.telaAcesa) keepAwake(); else if(wakeLock){ wakeLock.release(); wakeLock=null; } renderSettings(); };
@@ -991,6 +1192,7 @@ function show(v){
   if(v==='home' || v==='nav'){
     const slot = $(v==='home' ? '#homeMapSlot' : '#navMapSlot');
     if($('#mapWrap').parentNode !== slot) slot.appendChild($('#mapWrap'));
+    $('#mapWrap').classList.toggle('mini', v === 'home' && musicBig());
     if(map) setTimeout(() => { map.invalidateSize(); if(routeLine && !follow) fitRoute(); }, 60);
   }
 }
@@ -1001,8 +1203,11 @@ function renderAll(){ renderNav(); renderMusic(); renderPhone(); renderSettings(
 
 /* ================== início ================== */
 (async function init(){
+  applyTheme();
   initMap();
   renderAll();
+  renderWx(); applyLayout(); wxLoad();
+  setInterval(() => wxLoad(), 10*60*1000);
   await spCallback();
   renderMusic(); renderSettings(); spPoll();
   if(S.gps) startGps();
